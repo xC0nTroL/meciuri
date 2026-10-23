@@ -227,13 +227,13 @@
     <p>Intră o singură dată. Datele rămân salvate pe telefon.</p>
     <form id="loginForm" autocomplete="on">
       <label>Email
-        <input type="email" id="lEmail" autocomplete="username" required>
+        <input type="email" id="lEmail" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
       </label>
       <label>Parolă
         <input type="password" id="lPass" autocomplete="current-password" required>
       </label>
       <label>Cheia de sincronizare
-        <input type="password" id="lKey" autocomplete="off" required>
+        <input type="password" id="lKey" autocomplete="off" autocapitalize="none" autocorrect="off" required>
       </label>
       <div class="hint">Valoarea APP_KEY din setările scriptului Google.</div>
       <div class="err" id="lErr" role="alert"></div>
@@ -611,7 +611,7 @@ document.addEventListener('visibilitychange', () => {
 $('#loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = $('#lBtn'); btn.disabled = true; $('#lErr').textContent = '';
-  const { error } = await sb.auth.signInWithPassword({ email: $('#lEmail').value.trim(), password: $('#lPass').value });
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lEmail').value.trim().toLowerCase(), password: $('#lPass').value });
   btn.disabled = false;
   if (error) { $('#lErr').textContent = error.message === 'Invalid login credentials' ? 'Email sau parolă greșită.' : error.message; return; }
   store.set('meciuri_app_key', $('#lKey').value.trim());
