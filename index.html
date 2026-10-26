@@ -527,7 +527,7 @@ function renderBarem() {
   const amountCell = (m, strike) => {
     if (m.fee_amount === null || m.fee_amount === undefined) return '<span class="a missing">fără tarif</span>';
     const tr = billingOf(m) !== 'ajf'
-      ? `<div class="w">${m.transport_amount != null ? '+ ' + lei(m.transport_amount) + ' transport' : '+ transport (fără preț)'}</div>` : '';
+      ? `<div class="w">${m.transport_with ? 'transport la ' + esc(leaderShort(m)) : m.transport_amount != null ? '+ ' + lei(m.transport_amount) + ' transport' : '+ transport (fără preț)'}</div>` : '';
     return `<span class="a${strike ? ' paid-mark' : ''}">${leiR(m.fee_amount)}${tr}</span>`;
   };
   const matchLine = (m, sub) => {
@@ -854,7 +854,11 @@ function openMatch(id, { push = true } = {}) {
           <input type="number" id="fFee" step="1" min="0" inputmode="decimal" value="${m.fee_amount ?? ''}" placeholder="Completează suma">
         </label>
         <div class="fee-hint">${feeHint(m)}</div>
-        ${billingOf(m) !== 'ajf' ? `
+        ${billingOf(m) !== 'ajf' && m.transport_with ? `
+          <div class="note">Transportul pentru drumul din ziua asta e decontat la ${esc(leaderTime(m))}.</div>
+          <label class="check"><input type="checkbox" id="fSep"> Am făcut drum separat pentru acest meci</label>`
+        : billingOf(m) !== 'ajf' ? `
+          ${m.transport_separate ? '<label class="check"><input type="checkbox" id="fSep" checked> Drum separat (primește transport și acest meci)</label>' : ''}
           <div class="two">
             <label>Km dus-întors
               <input type="number" id="fKm" step="0.1" min="0" inputmode="decimal" value="${m.transport_km ?? ''}">
@@ -865,7 +869,8 @@ function openMatch(id, { push = true } = {}) {
           </div>
           <div class="fee-hint">${m.transport_amount != null
             ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>.`
-            : 'Transportul se calculează după ce pui km și prețul carburantului.'}</div>` : ''}
+            : 'Transportul se calculează după ce pui km și prețul carburantului.'}
+            Km propuși sunt distanța din Football Connect × 2. Pune distanța reală, de exemplu până unde te întâlnești cu colegul.</div>` : ''}
         ${billingOf(m) === 'frf' ? `
           <label>Plătește
             <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
@@ -951,20 +956,34 @@ function openMatch(id, { push = true } = {}) {
       patch.fee_amount = amount;
       patch.fee_manual = amount !== null;   // gol = revino la barem
     }
-    if (billingOf(m) !== 'ajf') {
+    if (billingOf(m) !== 'ajf' && $('#fKm')) {
       const km = num($('#fKm').value), fuel = num($('#fFuel').value);
       if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
       if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
     }
+    if ($('#fSep') && $('#fSep').checked !== !!m.transport_separate) patch.transport_separate = $('#fSep').checked;
     if (billingOf(m) === 'frf') {
       patch.fee_payer = $('#fPayer').value.trim() || null;
       if ($('#fPaid').checked !== !!m.fee_paid) patch.fee_paid = $('#fPaid').checked;
     }
     if (!Object.keys(patch).length) { toast('Nimic de salvat'); return; }
     if (await save(patch, $('#fFeeSave'), 'Salvează barem-ul', 'Barem salvat')) {
+      // transportul altor meciuri din aceeași zi se poate schimba pe server
+      if ('transport_km' in patch || 'transport_separate' in patch || 'fuel_price' in patch) { try { await loadFromDb(); render(); } catch {} }
       const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
     }
   };
+}
+
+function leaderShort(m) {
+  const l = matches.find((x) => x.match_id === m.transport_with);
+  return l ? fmt.time(parseLocal(l.start_local)) : 'alt meci';
+}
+function leaderTime(m) {
+  const l = matches.find((x) => x.match_id === m.transport_with);
+  if (!l) return 'primul meci din zi';
+  const d = parseLocal(l.start_local);
+  return `meciul de la ${fmt.time(d)}${l.age_group && l.age_group !== 'Seniori' ? ' (' + l.age_group + ')' : ''}`;
 }
 
 function feeHint(m) {
