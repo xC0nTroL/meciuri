@@ -189,6 +189,13 @@
   .seg input:checked + span { border-color: var(--pitch-2); background: var(--pitch-2); color: #f3f5f1; }
   .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
   @media (prefers-color-scheme: dark) { .seg input:checked + span { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } }
+  .mblock > .w { font-size: 13.5px; color: var(--muted); }
+  .add-btn { display: block; width: 100%; margin-top: 16px; border: 1.5px dashed var(--muted); background: transparent; color: var(--ink);
+    border-radius: 10px; height: 46px; font-weight: 600; font-size: 15px; cursor: pointer; }
+  select { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); }
+  input[type=date], input[type=time] { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 10px 12px; font-size: 16px; color: var(--ink); min-height: 46px; }
+  .seg { flex-wrap: nowrap; }
+  .seg span { font-size: 14.5px; padding: 9px 2px; }
   .note { font-size: 14px; color: var(--muted); background: var(--chalk); border-radius: 8px; padding: 10px 12px; }
 
   /* ---------- foaia meciului (detalii) ---------- */
@@ -379,6 +386,11 @@ function myOfficial(m) { return (m.match_officials || []).find((o) => o.is_me); 
 function roleLabel(m) {
   const me = myOfficial(m);
   if (me) return officialRole(me);
+  const r = String(m.my_role || '').toLowerCase();
+  if (r.includes('observ')) return 'Observator';
+  if (r.includes('patrulea')) return 'Al 4-lea oficial';
+  if (r.includes('asistent')) return 'Asistent';
+  if (r === 'arbitru' || r.includes('central')) return 'Central';
   return m.my_role || 'Delegat';
 }
 function officialRole(o) {
@@ -406,6 +418,7 @@ async function loadFromDb() {
   if (error) throw error;
   matches = data || [];
   store.set('meciuri_cache', matches);
+  loadSettings().then(() => { if (tab === 'barem') render(); }).catch(() => {});
 }
 
 async function syncFromFc() {
@@ -469,96 +482,154 @@ function render() {
 const pad = (n) => String(n).padStart(2, '0');
 const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-const lei = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
+const lei = (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' lei';
+const leiR = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
 const isFrf = (m) => m.organizer === 'FRF';
+const billingOf = (m) => m.billing || (isFrf(m) ? 'frf' : 'ajf');
+const BILLING = { ajf: 'AJF Alba', ajf_club: 'FRF prin AJF', frf: 'FRF direct' };
 const counts = (m) => m.status === 'activ';
+const totalOf = (m) => Number(m.fee_amount || 0) + Number(m.transport_amount || 0);
+const sumOf = (list) => list.reduce((s, m) => s + totalOf(m), 0);
+let settings = store.get('meciuri_settings', { consum_l_100km: 7.5, pret_carburant: null });
+
+async function loadSettings() {
+  const { data } = await sb.from('settings').select('key, value');
+  if (data) { for (const r of data) settings[r.key] = r.value; store.set('meciuri_settings', settings); }
+}
 
 function renderBarem() {
   const played = matches.filter((m) => counts(m) && !isUpcoming(m));
   const later = matches.filter((m) => counts(m) && isUpcoming(m));
   if (!played.length && !later.length) {
-    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>';
+    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>' + settingsBox();
     return;
   }
-  const due = played.filter((m) => !m.fee_paid).reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-  const paid = played.filter((m) => m.fee_paid).reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-  const laterSum = later.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+  const due = sumOf(played.filter((m) => !m.fee_paid));
+  const paid = sumOf(played.filter((m) => m.fee_paid));
+  const laterSum = sumOf(later);
   const missing = played.filter((m) => m.fee_amount === null || m.fee_amount === undefined).length;
+  const noFuel = played.some((m) => billingOf(m) !== 'ajf' && m.transport_amount == null);
 
-  // grupare pe luni, cele mai recente primele
+  // luni → facturi: AJF (una), FRF prin AJF (una pe club), FRF direct (pe meci)
   const months = new Map();
   for (const m of played.sort((a, b) => parseLocal(b.start_local) - parseLocal(a.start_local))) {
     const d = parseLocal(m.start_local), k = monthKey(d);
-    if (!months.has(k)) months.set(k, { label: fmt.month(d), ajf: [], frf: [] });
-    months.get(k)[isFrf(m) ? 'frf' : 'ajf'].push(m);
+    if (!months.has(k)) months.set(k, { label: fmt.month(d), ajf: [], clubs: new Map(), frf: [] });
+    const g = months.get(k), b = billingOf(m);
+    if (b === 'ajf') g.ajf.push(m);
+    else if (b === 'ajf_club') {
+      const c = m.fee_payer || m.home_club;
+      if (!g.clubs.has(c)) g.clubs.set(c, []);
+      g.clubs.get(c).push(m);
+    } else g.frf.push(m);
   }
 
-  const feeRow = (m, withCheck) => {
+  const amountCell = (m, strike) => {
+    if (m.fee_amount === null || m.fee_amount === undefined) return '<span class="a missing">fără tarif</span>';
+    const tr = billingOf(m) !== 'ajf'
+      ? `<div class="w">${m.transport_amount != null ? '+ ' + lei(m.transport_amount) + ' transport' : '+ transport (fără preț)'}</div>` : '';
+    return `<span class="a${strike ? ' paid-mark' : ''}">${leiR(m.fee_amount)}${tr}</span>`;
+  };
+  const matchLine = (m, sub) => {
     const d = parseLocal(m.start_local);
-    const amount = m.fee_amount === null || m.fee_amount === undefined
-      ? '<span class="a missing">fără tarif</span>'
-      : `<span class="a${withCheck && m.fee_paid ? ' paid-mark' : ''}">${lei(m.fee_amount)}</span>`;
-    const who = withCheck ? `Plătește ${esc(m.fee_payer || m.home_club)}` : `${esc(m.competition)}, ${esc(roleLabel(m))}`;
-    return `
-      <div class="fee-row" ${withCheck ? '' : `data-id="${m.match_id}" role="button" tabindex="0"`}>
-        <div class="${withCheck ? 'frf-pay' : ''}">
-          ${withCheck ? `<input type="checkbox" data-pay="${m.match_id}" ${m.fee_paid ? 'checked' : ''} aria-label="Încasat ${esc(m.home_club)} – ${esc(m.away_club)}">` : ''}
-          <div ${withCheck ? `data-id="${m.match_id}" role="button" tabindex="0"` : ''}>
-            <div>${d.getDate()} ${esc(d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
-            <div class="w">${who}</div>
-          </div>
-        </div>
-        ${amount}
+    return `<div data-id="${m.match_id}" role="button" tabindex="0">
+        <div>${d.getDate()} ${esc(d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
+        <div class="w">${sub}</div>
+      </div>`;
+  };
+  const invoice = (title, list, key) => {
+    const allPaid = list.every((m) => m.fee_paid);
+    const paidAt = allPaid && list[0].fee_paid_at ? new Date(list[0].fee_paid_at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '';
+    const fees = list.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+    const tr = list.reduce((s, m) => s + Number(m.transport_amount || 0), 0);
+    return `<div class="org"><span>${esc(title)}</span><span>${lei(fees + tr)}</span></div>
+      ${tr ? `<div class="w" style="padding:0 14px 4px">${lei(fees)} barem + ${lei(tr)} transport</div>` : ''}
+      ${list.map((m) => `<div class="fee-row">${matchLine(m, `${esc(m.competition)}, ${esc(roleLabel(m))}`)}${amountCell(m, false)}</div>`).join('')}
+      <div class="paybar">
+        <span class="st${allPaid ? ' ok' : ''}">${allPaid ? 'Încasat' + (paidAt ? ' pe ' + esc(paidAt) : '') : 'Neîncasat'}</span>
+        <button class="pay-btn${allPaid ? ' on' : ''}" type="button" data-group="${esc(key)}" data-paid="${allPaid ? '0' : '1'}">${allPaid ? 'Anulează încasarea' : 'Marchează încasat'}</button>
       </div>`;
   };
 
   let html = `
     <div class="owed">
-      <div class="due${due ? '' : ' zero'}"><b>${lei(due)}</b><span>de încasat</span></div>
-      <div><b>${lei(paid)}</b><span>încasat</span></div>
-      ${laterSum ? `<div class="later">Încă ${lei(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
+      <div class="due${due ? '' : ' zero'}"><b>${leiR(due)}</b><span>de încasat</span></div>
+      <div><b>${leiR(paid)}</b><span>încasat</span></div>
+      ${laterSum ? `<div class="later">Încă ${leiR(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
       ${missing ? `<div class="later">${missing === 1 ? 'Un meci nu are' : missing + ' meciuri nu au'} tarif. Deschide-l și completează suma.</div>` : ''}
+      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului mai jos.</div>' : ''}
     </div>`;
 
+  groups = new Map();
   for (const [k, g] of months) {
-    const total = [...g.ajf, ...g.frf].reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+    const all = [...g.ajf, ...[...g.clubs.values()].flat(), ...g.frf];
     html += `<h2 class="month">${esc(g.label)}</h2><div class="mblock">
-      <div class="mhead"><h3>${g.ajf.length + g.frf.length} ${g.ajf.length + g.frf.length === 1 ? 'meci' : 'meciuri'}</h3><span class="sum">${lei(total)}</span></div>`;
+      <div class="mhead"><h3>${all.length} ${all.length === 1 ? 'meci' : 'meciuri'}</h3><span class="sum">${leiR(sumOf(all))}</span></div>`;
     if (g.ajf.length) {
-      const ajfSum = g.ajf.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-      const allPaid = g.ajf.every((m) => m.fee_paid);
-      const paidAt = allPaid && g.ajf[0].fee_paid_at ? new Date(g.ajf[0].fee_paid_at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '';
-      html += `<div class="org"><span>AJF Alba, plată lunară</span><span>${lei(ajfSum)}</span></div>
-        ${g.ajf.map((m) => feeRow(m, false)).join('')}
-        <div class="paybar">
-          <span class="st${allPaid ? ' ok' : ''}">${allPaid ? 'Încasat' + (paidAt ? ' pe ' + esc(paidAt) : '') : 'Neîncasat'}</span>
-          <button class="pay-btn${allPaid ? ' on' : ''}" type="button" data-month="${k}" data-paid="${allPaid ? '0' : '1'}">${allPaid ? 'Anulează încasarea' : 'Marchează încasat'}</button>
-        </div>`;
+      const key = `${k}|ajf`; groups.set(key, g.ajf);
+      html += invoice('Factură AJF Alba', g.ajf, key);
+    }
+    for (const [club, list] of g.clubs) {
+      const key = `${k}|club|${club}`; groups.set(key, list);
+      html += invoice(`Factură AJF pentru ${club}`, list, key);
     }
     if (g.frf.length) {
-      const frfSum = g.frf.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-      html += `<div class="org"><span>FRF, plată pe meci</span><span>${lei(frfSum)}</span></div>
-        ${g.frf.map((m) => feeRow(m, true)).join('')}<div style="height:6px"></div>`;
+      html += `<div class="org"><span>FRF direct, pe meci</span><span>${lei(sumOf(g.frf))}</span></div>
+        ${g.frf.map((m) => `
+          <div class="fee-row"><div class="frf-pay">
+            <input type="checkbox" data-pay="${m.match_id}" ${m.fee_paid ? 'checked' : ''} aria-label="Încasat ${esc(m.home_club)} – ${esc(m.away_club)}">
+            ${matchLine(m, 'Plătește ' + esc(m.fee_payer || m.home_club))}
+          </div>${amountCell(m, m.fee_paid)}</div>`).join('')}<div style="height:6px"></div>`;
     }
     html += '</div>';
   }
-  $('#view').innerHTML = html;
+  $('#view').innerHTML = html + settingsBox();
+}
+let groups = new Map();
+
+function settingsBox() {
+  return `
+    <h2 class="month">Transport FRF</h2>
+    <form class="mine" id="setForm">
+      <div class="two">
+        <label>Consum (l / 100 km)
+          <input type="number" id="sCons" step="0.1" min="0" inputmode="decimal" value="${settings.consum_l_100km ?? ''}">
+        </label>
+        <label>Preț carburant (lei / l)
+          <input type="number" id="sPrice" step="0.01" min="0" inputmode="decimal" value="${settings.pret_carburant ?? ''}" placeholder="ex. 7,80">
+        </label>
+      </div>
+      <div class="fee-hint">Transport = km dus-întors × consum × preț. Prețul de pe un bon anume îl pui în foaia meciului.</div>
+      <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
+    </form>`;
 }
 
-async function setMonthPaid(key, paid) {
-  const [y, mo] = key.split('-').map(Number);
-  const from = localIso(new Date(y, mo - 1, 1));
-  const to = localIso(new Date(y, mo, 1));
-  const until = localIso(new Date(Math.min(Date.now() - 2 * 3600 * 1000, new Date(y, mo, 1).getTime())));
-  const { data, error } = await sb.from('matches')
-    .update({ fee_paid: paid })
-    .eq('organizer', 'AJF').eq('status', 'activ')
-    .gte('start_local', from).lt('start_local', to).lte('start_local', until)
-    .select('match_id, fee_paid, fee_paid_at');
-  if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+async function saveSettings(ev) {
+  ev.preventDefault();
+  const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
+  const btn = $('#sSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
+  const rows = [['consum_l_100km', num($('#sCons').value)], ['pret_carburant', num($('#sPrice').value)]];
+  let err = null;
+  for (const [key, value] of rows) {
+    const { error } = await sb.from('settings').update({ value }).eq('key', key);
+    if (error) err = error; else settings[key] = value;
+  }
+  store.set('meciuri_settings', settings);
+  if (err) { toast('Nu s-a salvat: ' + err.message); btn.disabled = false; btn.textContent = 'Salvează și recalculează'; return; }
+  await loadFromDb();
+  toast('Transport recalculat');
+  render();
+}
+
+async function setGroupPaid(key, paid) {
+  const list = groups.get(key) || [];
+  const ids = list.map((m) => m.match_id);
+  if (!ids.length) return;
+  const { data, error } = await sb.from('matches').update({ fee_paid: paid }).in('match_id', ids).select('match_id, fee_paid, fee_paid_at');
+  if (error) { toast('Nu s-a salvat: ' + error.message); render(); return; }
   for (const r of data || []) Object.assign(matches.find((m) => m.match_id === r.match_id) || {}, r);
   store.set('meciuri_cache', matches);
-  toast(paid ? 'Luna marcată ca încasată' : 'Încasarea a fost anulată');
+  toast(paid ? 'Factura marcată ca încasată' : 'Încasarea a fost anulată');
   render();
 }
 
@@ -569,6 +640,87 @@ async function setMatchPaid(id, paid) {
   store.set('meciuri_cache', matches);
   toast(paid ? 'Încasat' : 'Marcat neîncasat');
   render();
+}
+
+/* ---------- adaugă meci (ex. juniori delegați pe ajfalba.ro) ---------- */
+const COMPETITIONS = ['Liga 4', 'Liga 5', 'SuperLiga AJF Alba', 'Campionatul Național U19', 'Campionatul Național U17',
+  'Campionatul Național U16', 'Campionatul Național U15', 'Campionatul Național U14', 'Campionatul Național U13',
+  'Juniori U19 Interjudețean', 'Juniori U17 Interjudețean', 'Juniori U16 Interjudețean', 'Juniori U16 Clasic',
+  'Juniori U15 Interjudețean', 'Juniori U15 Clasic', 'Juniori U14 Clasic', 'Juniori U13 Interjudețean', 'Juniori U13 Clasic',
+  'Juniori U12 Elite', 'Juniori U12 Clasic', 'Juniori U11 Elite', 'Juniori U11 Clasic', 'Juniori U10', 'Juniori U9',
+  'Liga de Tineret', 'Cupa Satelor', 'Interligă', 'Feminin'];
+
+function openAdd() {
+  const sh = $('#sheet');
+  const now = new Date();
+  const clubs = [...new Set(matches.flatMap((m) => [m.home_club, m.away_club]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ro'));
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">Adaugă un meci</div></div>
+    </div>
+    <div class="sec">
+      <p class="fee-hint" style="margin:18px 0 0">Pentru delegările care nu apar în Football Connect, de exemplu juniorii de pe ajfalba.ro.</p>
+      <form class="mine" id="addForm" style="margin-top:14px">
+        <div class="two">
+          <label>Data <input type="date" id="aDate" required value="${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}"></label>
+          <label>Ora <input type="time" id="aTime" required value="11:00"></label>
+        </div>
+        <label>Competiția
+          <input type="text" id="aComp" list="compList" required placeholder="ex. Campionatul Național U16">
+          <datalist id="compList">${COMPETITIONS.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+        </label>
+        <label>Gazdă <input type="text" id="aHome" list="clubList" required></label>
+        <label>Oaspete <input type="text" id="aAway" list="clubList" required></label>
+        <datalist id="clubList">${clubs.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+        <div class="two">
+          <label>Rolul meu
+            <select id="aRole">
+              <option value="Arbitru">Central</option>
+              <option value="Arbitru asistent">Asistent</option>
+              <option value="Al patrulea oficial">Al 4-lea oficial</option>
+              <option value="Observator">Observator</option>
+            </select>
+          </label>
+          <label>Distanța (km, dus) <input type="number" id="aKm" step="0.1" min="0" inputmode="decimal"></label>
+        </div>
+        <label>Stadion <input type="text" id="aStadium"></label>
+        <div class="fee-hint">Barem-ul și tipul facturii se completează singure după competiție și clubul gazdă.</div>
+        <button class="primary" type="submit" id="aSave">Adaugă meciul</button>
+      </form>
+    </div>`;
+  sh.classList.remove('hidden');
+  sh.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  history.pushState({ sheet: 'add' }, '');
+  $('#back').onclick = () => history.back();
+  $('#addForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = $('#aSave'); btn.disabled = true; btn.textContent = 'Se adaugă…';
+    const comp = $('#aComp').value.trim();
+    const age = (comp.match(/U\s?\d{1,2}/i) || [''])[0].toUpperCase().replace(/\s/g, '') || (/tineret/i.test(comp) ? 'Tineret' : 'Seniori');
+    const d = $('#aDate').value; // AAAA-LL-ZZ
+    const y = Number(d.slice(0, 4)), mo = Number(d.slice(5, 7));
+    const season = mo >= 7 ? `${String(y).slice(2)}-${String(y + 1).slice(2)}` : `${String(y - 1).slice(2)}-${String(y).slice(2)}`;
+    const km = $('#aKm').value === '' ? null : Number($('#aKm').value.replace(',', '.'));
+    const row = {
+      source: 'manual', competition: comp, age_group: age, season,
+      home_club: $('#aHome').value.trim(), away_club: $('#aAway').value.trim(),
+      stadium: $('#aStadium').value.trim() || null,
+      start_local: `${d}T${$('#aTime').value}:00`, my_role: $('#aRole').value, distance_km: km,
+    };
+    const { data, error } = await sb.from('matches').insert(row).select('*');
+    btn.disabled = false; btn.textContent = 'Adaugă meciul';
+    if (error) { toast('Nu s-a adăugat: ' + error.message); return; }
+    const m = { ...data[0], match_officials: [] };
+    matches.push(m); store.set('meciuri_cache', matches);
+    toast('Meci adăugat');
+    render();
+    openMatch(m.match_id, { push: false });
+  };
 }
 
 function renderNext() {
@@ -592,13 +744,14 @@ function renderList() {
   const view = $('#view');
   let list = matches.filter((m) => tab === 'upcoming' ? isUpcoming(m) : !isUpcoming(m));
   list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * (parseLocal(a.start_local) - parseLocal(b.start_local)));
+  const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de pe ajfalba.ro</button>';
   if (!list.length) {
-    view.innerHTML = tab === 'upcoming'
+    view.innerHTML = (tab === 'upcoming'
       ? '<div class="empty"><b>Nimic programat</b>Apasă Verifică după ce primești mailul de delegare.</div>'
-      : '<div class="empty"><b>Niciun meci jucat încă</b>Meciurile apar aici după ce trece data lor.</div>';
+      : '<div class="empty"><b>Niciun meci jucat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
     return;
   }
-  let html = '', month = '';
+  let html = addBtn, month = '';
   for (const m of list) {
     const d = parseLocal(m.start_local);
     const mo = fmt.month(d);
@@ -691,22 +844,37 @@ function openMatch(id, { push = true } = {}) {
 
       <h2>Barem</h2>
       <form class="mine" id="feeForm">
-        <div class="seg" role="radiogroup" aria-label="Organizator">
-          <label><input type="radio" name="org" value="AJF" ${!isFrf(m) ? 'checked' : ''}><span>AJF Alba</span></label>
-          <label><input type="radio" name="org" value="FRF" ${isFrf(m) ? 'checked' : ''}><span>FRF</span></label>
+        <div class="seg" role="radiogroup" aria-label="Cui faci factura">
+          ${Object.entries(BILLING).map(([v, t]) => `<label><input type="radio" name="bill" value="${v}" ${billingOf(m) === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
         </div>
-        <label>Suma (lei)
+        <div class="fee-hint">${billingOf(m) === 'ajf' ? 'Intră în factura lunară către AJF.'
+          : billingOf(m) === 'ajf_club' ? `Factura merge la AJF, separat pentru ${esc(m.fee_payer || m.home_club)}, cu transport.`
+          : 'Încasezi direct, pe meci, cu transport.'}</div>
+        <label>Barem (lei)
           <input type="number" id="fFee" step="1" min="0" inputmode="decimal" value="${m.fee_amount ?? ''}" placeholder="Completează suma">
         </label>
         <div class="fee-hint">${feeHint(m)}</div>
-        ${isFrf(m) ? `
+        ${billingOf(m) !== 'ajf' ? `
+          <div class="two">
+            <label>Km dus-întors
+              <input type="number" id="fKm" step="0.1" min="0" inputmode="decimal" value="${m.transport_km ?? ''}">
+            </label>
+            <label>Preț carburant (lei/l)
+              <input type="number" id="fFuel" step="0.01" min="0" inputmode="decimal" value="${m.fuel_price ?? ''}" placeholder="${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' (implicit)' : 'nesetat'}">
+            </label>
+          </div>
+          <div class="fee-hint">${m.transport_amount != null
+            ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>.`
+            : 'Transportul se calculează după ce pui km și prețul carburantului.'}</div>` : ''}
+        ${billingOf(m) === 'frf' ? `
           <label>Plătește
             <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
           </label>
           <label class="check"><input type="checkbox" id="fPaid" ${m.fee_paid ? 'checked' : ''}> Încasat${m.fee_paid && m.fee_paid_at ? ' pe ' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') : ''}</label>`
-        : `<div class="note">${m.fee_paid ? 'Încasat odată cu luna' + (m.fee_paid_at ? ' (' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') + ')' : '') + '.' : 'Se încasează lunar. Marchezi plata din tab-ul Barem.'}</div>`}
+        : `<div class="note">${m.fee_paid ? 'Încasat odată cu factura' + (m.fee_paid_at ? ' (' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') + ')' : '') + '.' : 'Se încasează cu factura lunii. Marchezi plata din tab-ul Barem.'}</div>`}
         <button class="primary" type="submit" id="fFeeSave">Salvează barem-ul</button>
       </form>
+      ${m.source === 'manual' ? `<button class="logout" type="button" id="delMatch">Șterge meciul (adăugat de mână)</button>` : ''}
 
       <h2>Notițele mele</h2>
       <form class="mine" id="mine">
@@ -748,12 +916,25 @@ function openMatch(id, { push = true } = {}) {
       $('#fSave'), 'Salvează notițele', 'Notițe salvate');
   };
 
-  // schimbarea organizatorului se salvează imediat (AJF/FRF schimbă tariful și felul plății)
-  sh.querySelectorAll('input[name=org]').forEach((r) => r.onchange = async () => {
-    if (await save({ organizer: r.value, organizer_manual: true }, null, '', r.value === 'FRF' ? 'Mutat la FRF' : 'Mutat la AJF')) {
+  // tipul facturii se salvează imediat (schimbă tariful, plătitorul și transportul)
+  sh.querySelectorAll('input[name=bill]').forEach((r) => r.onchange = async () => {
+    const patch = { billing: r.value, billing_manual: true, organizer: r.value === 'ajf' ? 'AJF' : 'FRF', organizer_manual: true };
+    if (await save(patch, null, '', 'Mutat la ' + BILLING[r.value])) {
       const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
     }
   });
+
+  const del = $('#delMatch');
+  if (del) del.onclick = async () => {
+    if (!confirm('Ștergi meciul ' + m.home_club + ' – ' + m.away_club + '?')) return;
+    const { error } = await sb.from('matches').delete().eq('match_id', id).eq('source', 'manual');
+    if (error) { toast('Nu s-a șters: ' + error.message); return; }
+    matches = matches.filter((x) => x.match_id !== id);
+    store.set('meciuri_cache', matches);
+    toast('Meci șters');
+    history.back();
+    render();
+  };
 
   const reset = sh.querySelector('[data-reset-fee]');
   if (reset) reset.onclick = async () => {
@@ -770,9 +951,14 @@ function openMatch(id, { push = true } = {}) {
       patch.fee_amount = amount;
       patch.fee_manual = amount !== null;   // gol = revino la barem
     }
-    if (isFrf(m)) {
+    if (billingOf(m) !== 'ajf') {
+      const km = num($('#fKm').value), fuel = num($('#fFuel').value);
+      if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
+      if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
+    }
+    if (billingOf(m) === 'frf') {
       patch.fee_payer = $('#fPayer').value.trim() || null;
-      patch.fee_paid = $('#fPaid').checked;
+      if ($('#fPaid').checked !== !!m.fee_paid) patch.fee_paid = $('#fPaid').checked;
     }
     if (!Object.keys(patch).length) { toast('Nimic de salvat'); return; }
     if (await save(patch, $('#fFeeSave'), 'Salvează barem-ul', 'Barem salvat')) {
@@ -785,10 +971,8 @@ function feeHint(m) {
   const split = m.fee_hg || m.fee_team
     ? ` (${[m.fee_hg ? lei(m.fee_hg) + ' HG' : '', m.fee_team ? lei(m.fee_team) + ' echipă' : ''].filter(Boolean).join(' + ')})` : '';
   if (m.fee_manual) return `Sumă pusă de tine. <button type="button" data-reset-fee>Revino la barem</button>`;
-  if (m.fee_label) return `Din barem-ul ${esc(m.organizer || 'AJF')} 26-27: ${esc(m.fee_label)}${split}.`;
-  return isFrf(m)
-    ? 'Tarifele FRF nu sunt încă în barem. Completează suma de mână.'
-    : 'Nu am găsit competiția în barem. Completează suma de mână.';
+  if (m.fee_label) return `Din barem-ul ${esc(m.organizer === 'FRF' ? 'FRF' : 'AJF 26-27')}: ${esc(m.fee_label)}${split}.`;
+  return 'Competiția nu e în barem (ex. seniori FRF). Completează suma de mână.';
 }
 function closeSheet() {
   $('#sheet').classList.add('hidden');
@@ -797,6 +981,9 @@ function closeSheet() {
 window.addEventListener('popstate', () => { if (!$('#sheet').classList.contains('hidden')) closeSheet(); });
 
 /* ---------- evenimente ---------- */
+document.addEventListener('submit', (e) => {
+  if (e.target.id === 'setForm') saveSettings(e);
+});
 document.addEventListener('change', (e) => {
   const p = e.target.closest('input[data-pay]');
   if (p) setMatchPaid(p.dataset.pay, p.checked);
@@ -807,8 +994,9 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (e.target.closest('input[data-pay]')) return;
-  const mb = e.target.closest('button[data-month]');
-  if (mb) { mb.disabled = true; setMonthPaid(mb.dataset.month, mb.dataset.paid === '1'); return; }
+  const gb = e.target.closest('button[data-group]');
+  if (gb) { gb.disabled = true; setGroupPaid(gb.dataset.group, gb.dataset.paid === '1'); return; }
+  if (e.target.closest('#addMatch')) { openAdd(); return; }
   const item = e.target.closest('[data-id]');
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
