@@ -215,6 +215,8 @@
   .ln-main .ln-meta { font-size: 12.5px; }
   .ln-val { font-weight: 600; white-space: nowrap; }
   ol.lines li.missing .ln-val, .missing { color: var(--red); }
+  .to-field { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .to-field input { padding: 8px 10px; font-size: 15px; }
   .add-btn { display: block; width: 100%; margin-top: 16px; border: 1.5px dashed var(--muted); background: transparent; color: var(--ink);
     border-radius: 10px; height: 46px; font-weight: 600; font-size: 15px; cursor: pointer; }
   select { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); }
@@ -478,6 +480,7 @@ async function refresh({ fromFc = true } = {}) {
         if (r.inserted > 0) toast(r.inserted === 1 ? 'O delegare nouă' : `${r.inserted} delegări noi`);
         else if (r.cancelled > 0) toast(r.cancelled === 1 ? 'O delegare a fost anulată' : `${r.cancelled} delegări anulate`);
         else if (r.skipped) toast('Sincronizarea rula deja, am încărcat ultimele date');
+        if (r.errors && r.errors.length) setTimeout(() => toast(r.errors.join(' · ')), 3400);
       }
     } else {
       await loadFromDb();
@@ -526,15 +529,20 @@ async function loadSettings() {
 
 /* rândurile facturii, în formatul din SmartBill */
 const ageSuffix = (m) => (m.age_group && !/senior/i.test(m.age_group) ? ' ' + m.age_group : '');
-const routeOf = (m) => m.transport_route || `${settings.localitate_plecare || 'Ocna Mures'} - ${cleanStadium(m.stadium) || m.home_club}`;
+const destOf = (m) => m.transport_to || m.venue_city || '';
+const routeOf = (m) => m.transport_to || !m.transport_route
+  ? `${settings.localitate_plecare || 'Ocna Mures'} - ${destOf(m) || '…'}`
+  : m.transport_route;
 function invoiceLines(list) {
   const lines = [];
   for (const m of [...list].sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local))) {
     lines.push({ m, name: 'Barem arbitraj', desc: `Servicii de arbitraj sportiv la meciul ${m.home_club} - ${m.away_club}${ageSuffix(m)}`, um: 'Meci', qty: 1, price: m.fee_amount });
   }
   for (const m of list) {
-    if (billingOf(m) !== 'ajf' && Number(m.transport_amount) > 0) {
-      lines.push({ m, name: 'Transport', desc: `Transport: ${routeOf(m)}`, um: 'Buc', qty: 1, price: m.transport_amount, transport: true });
+    // un rând pe drum: la meciul care primește transportul (nu la cele „incluse")
+    if (billingOf(m) !== 'ajf' && !m.transport_with && !(m.transport_amount != null && Number(m.transport_amount) === 0)) {
+      lines.push({ m, name: 'Transport', desc: `Transport: ${routeOf(m)}`, um: 'Buc', qty: 1,
+        price: m.transport_amount == null ? null : Number(m.transport_amount), transport: true });
     }
   }
   return lines;
@@ -642,12 +650,15 @@ function openInvoice(key, { push = true } = {}) {
         ${lines.map((l) => `
           <li${l.price == null ? ' class="missing"' : ''}>
             <div class="ln-main"><b>${esc(l.name)}</b><span>${esc(l.desc)}</span>
-              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? 'fără tarif' : money2(l.price) + ' lei'}${l.transport ? ` · ${String(l.m.transport_km ?? '').replace('.', ',')} km` : ''}</span></div>
+              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? (l.transport ? 'completează km în foaia meciului' : 'fără tarif') : money2(l.price) + ' lei'}${l.transport ? ` · ${String(l.m.transport_km ?? '').replace('.', ',')} km` : ''}</span>
+              ${l.transport ? `<label class="to-field">Merg până la
+                <input type="text" data-to="${l.m.match_id}" value="${esc(l.m.transport_to || '')}" placeholder="${esc(l.m.venue_city || 'ex. Blaj')}" enterkeyhint="done">
+              </label>` : ''}</div>
             <div class="ln-val">${l.price == null ? '–' : money2(l.price)}</div>
           </li>`).join('')}
       </ol>
       <button class="add-btn" type="button" id="copyLines">Copiază rândurile pentru SmartBill</button>
-      <p class="fee-hint" style="margin-top:8px">Rândurile de transport se schimbă din foaia meciului (km, preț, traseu).</p>
+      <p class="fee-hint" style="margin-top:8px">Km și prețul carburantului se schimbă din foaia meciului.</p>
 
       <h2>Evidență</h2>
       <form class="mine" id="invForm">
@@ -676,6 +687,16 @@ function openInvoice(key, { push = true } = {}) {
     history.pushState({ sheet: 'inv' }, '');
   }
   $('#back').onclick = () => history.back();
+
+  sh.querySelectorAll('input[data-to]').forEach((inp) => inp.onchange = async () => {
+    const id = inp.dataset.to, val = inp.value.trim() || null;
+    const { error } = await sb.from('matches').update({ transport_to: val }).eq('match_id', id);
+    if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+    Object.assign(matches.find((m) => m.match_id === id) || {}, { transport_to: val });
+    store.set('meciuri_cache', matches);
+    toast('Traseu salvat');
+    const top = sh.scrollTop; openInvoice(key, { push: false }); sh.scrollTop = top;
+  });
 
   $('#copyLines').onclick = async () => {
     const text = lines.map((l, i) => [i + 1, l.name, l.desc, l.um, l.qty, l.price == null ? '' : money2(l.price), l.price == null ? '' : money2(l.price * l.qty)].join('\t')).join('\n')
@@ -770,7 +791,7 @@ function openAdd() {
       <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">Adaugă un meci</div></div>
     </div>
     <div class="sec">
-      <p class="fee-hint" style="margin:18px 0 0">Pentru delegările care nu apar în Football Connect, de exemplu juniorii de pe ajfalba.ro.</p>
+      <p class="fee-hint" style="margin:18px 0 0">Pentru meciurile care nu apar nici în Football Connect, nici pe ajfalba.ro (turnee, amicale).</p>
       <form class="mine" id="addForm" style="margin-top:14px">
         <div class="two">
           <label>Data <input type="date" id="aDate" required value="${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}"></label>
@@ -851,7 +872,7 @@ function renderList() {
   const view = $('#view');
   let list = matches.filter((m) => tab === 'upcoming' ? isUpcoming(m) : !isUpcoming(m));
   list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * (parseLocal(a.start_local) - parseLocal(b.start_local)));
-  const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de pe ajfalba.ro</button>';
+  const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de mână</button>';
   if (!list.length) {
     view.innerHTML = (tab === 'upcoming'
       ? '<div class="empty"><b>Nimic programat</b>Apasă Verifică după ce primești mailul de delegare.</div>'
@@ -944,6 +965,7 @@ function openMatch(id, { push = true } = {}) {
         ${m.distance_km ? `<div><dt>Distanță</dt><dd>${fmt.km(m.distance_km)} (dus)</dd></div>` : ''}
         <div><dt>Rolul meu</dt><dd>${esc(roleLabel(m))}${m.is_confirmed ? ', confirmat' : ', neconfirmat'}</dd></div>
         <div><dt>Sezon</dt><dd>${esc(m.season || '–')}</dd></div>
+        <div><dt>Sursa</dt><dd>${m.source === 'ajfalba' ? 'ajfalba.ro' : m.source === 'manual' ? 'adăugat de mână' : 'Football Connect'}</dd></div>
       </dl>
 
       ${crew.length ? `<h2>Brigada</h2>
@@ -974,13 +996,14 @@ function openMatch(id, { push = true } = {}) {
               <input type="number" id="fFuel" step="0.01" min="0" inputmode="decimal" value="${m.fuel_price ?? ''}" placeholder="${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' (implicit)' : 'nesetat'}">
             </label>
           </div>
-          <label>Traseu (apare pe factură)
-            <input type="text" id="fRoute" value="${esc(m.transport_route || '')}" placeholder="${esc(routeOf(m))}">
+          <label>Merg până la (apare pe factură)
+            <input type="text" id="fTo" value="${esc(m.transport_to || '')}" placeholder="${esc(m.venue_city || 'ex. Blaj')}">
           </label>
+          <div class="fee-hint">Pe factură: Transport: ${esc(routeOf(m))}</div>
           <div class="fee-hint">${m.transport_amount != null
             ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>.`
             : 'Transportul se calculează după ce pui km și prețul carburantului.'}
-            Km propuși sunt distanța din Football Connect × 2. Pune distanța reală, de exemplu până unde te întâlnești cu colegul.</div>` : ''}
+            ${m.source === 'fc' ? 'Km propuși sunt distanța din Football Connect × 2. ' : ''}Pune distanța reală dus-întors, de exemplu până unde te întâlnești cu colegul.</div>` : ''}
         ${billingOf(m) === 'frf' ? `
           <label>Plătește
             <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
@@ -1070,8 +1093,8 @@ function openMatch(id, { push = true } = {}) {
       const km = num($('#fKm').value), fuel = num($('#fFuel').value);
       if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
       if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
-      const route = $('#fRoute').value.trim() || null;
-      if (route !== (m.transport_route || null)) patch.transport_route = route;
+      const to = $('#fTo').value.trim() || null;
+      if (to !== (m.transport_to || null)) patch.transport_to = to;
     }
     if ($('#fSep') && $('#fSep').checked !== !!m.transport_separate) patch.transport_separate = $('#fSep').checked;
     if (billingOf(m) === 'frf') {
