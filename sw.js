@@ -1,6 +1,6 @@
 // Service worker: păstrează aplicația în cache ca să se deschidă și fără semnal.
 // Datele (Supabase, Apps Script) merg mereu la rețea; ultima listă e salvată de aplicație.
-const CACHE = 'meciuri-v5';
+const CACHE = 'meciuri-v6';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

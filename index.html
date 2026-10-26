@@ -190,6 +190,31 @@
   .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
   @media (prefers-color-scheme: dark) { .seg input:checked + span { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } }
   .mblock > .w { font-size: 13.5px; color: var(--muted); }
+  .inv { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+    background: transparent; border: 0; border-top: 1px solid var(--rule); padding: 12px 14px; cursor: pointer; color: var(--ink); }
+  .inv-l { display: grid; gap: 2px; }
+  .inv-l b { font-weight: 600; font-size: 15.5px; }
+  .inv-l span { font-size: 13.5px; color: var(--muted); }
+  .inv-l .inv-st { font-weight: 600; margin-top: 2px; }
+  .inv-st.issued { color: #b07a00; }
+  .inv-st.ok { color: var(--pitch-2); }
+  @media (prefers-color-scheme: dark) { .inv-st.ok { color: var(--yellow); } .inv-st.issued { color: #f0b44a; } }
+  .inv-r { font-family: var(--display); font-weight: 700; font-size: 20px; white-space: nowrap; }
+  .inv-head { display: grid; gap: 14px; margin-top: 12px; }
+  .inv-head span { display: block; font-size: 13px; color: #b6cbc1; }
+  .inv-head b { font-family: var(--display); font-weight: 600; font-size: 22px; line-height: 1.15; }
+  .inv-total { background: var(--pitch-2); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .inv-total b { font-size: 28px; font-weight: 700; }
+  ol.lines { list-style: none; margin: 0; padding: 4px 14px; background: var(--paper); border-radius: 10px; counter-reset: ln; }
+  ol.lines li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--rule); counter-increment: ln; }
+  ol.lines li:last-child { border-bottom: 0; }
+  ol.lines li::before { content: counter(ln); color: var(--muted); font-size: 14px; padding-top: 1px; }
+  .ln-main { display: grid; gap: 2px; min-width: 0; }
+  .ln-main b { font-weight: 600; }
+  .ln-main span { font-size: 13.5px; color: var(--muted); }
+  .ln-main .ln-meta { font-size: 12.5px; }
+  .ln-val { font-weight: 600; white-space: nowrap; }
+  ol.lines li.missing .ln-val, .missing { color: var(--red); }
   .add-btn { display: block; width: 100%; margin-top: 16px; border: 1.5px dashed var(--muted); background: transparent; color: var(--ink);
     border-radius: 10px; height: 46px; font-weight: 600; font-size: 15px; cursor: pointer; }
   select { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); }
@@ -484,17 +509,47 @@ const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.get
 const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const lei = (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' lei';
 const leiR = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
+const money2 = (n) => Number(n || 0).toFixed(2);
 const isFrf = (m) => m.organizer === 'FRF';
 const billingOf = (m) => m.billing || (isFrf(m) ? 'frf' : 'ajf');
 const BILLING = { ajf: 'AJF Alba', ajf_club: 'FRF prin AJF', frf: 'FRF direct' };
 const counts = (m) => m.status === 'activ';
 const totalOf = (m) => Number(m.fee_amount || 0) + Number(m.transport_amount || 0);
 const sumOf = (list) => list.reduce((s, m) => s + totalOf(m), 0);
-let settings = store.get('meciuri_settings', { consum_l_100km: 7.5, pret_carburant: null });
+let settings = store.get('meciuri_settings', { consum_l_100km: 7.5, pret_carburant: null, localitate_plecare: 'Ocna Mures' });
+let groups = new Map();
 
 async function loadSettings() {
-  const { data } = await sb.from('settings').select('key, value');
-  if (data) { for (const r of data) settings[r.key] = r.value; store.set('meciuri_settings', settings); }
+  const { data } = await sb.from('settings').select('*');
+  if (data) { for (const r of data) settings[r.key] = r.value ?? r.text_value ?? null; store.set('meciuri_settings', settings); }
+}
+
+/* rândurile facturii, în formatul din SmartBill */
+const ageSuffix = (m) => (m.age_group && !/senior/i.test(m.age_group) ? ' ' + m.age_group : '');
+const routeOf = (m) => m.transport_route || `${settings.localitate_plecare || 'Ocna Mures'} - ${cleanStadium(m.stadium) || m.home_club}`;
+function invoiceLines(list) {
+  const lines = [];
+  for (const m of [...list].sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local))) {
+    lines.push({ m, name: 'Barem arbitraj', desc: `Servicii de arbitraj sportiv la meciul ${m.home_club} - ${m.away_club}${ageSuffix(m)}`, um: 'Meci', qty: 1, price: m.fee_amount });
+  }
+  for (const m of list) {
+    if (billingOf(m) !== 'ajf' && Number(m.transport_amount) > 0) {
+      lines.push({ m, name: 'Transport', desc: `Transport: ${routeOf(m)}`, um: 'Buc', qty: 1, price: m.transport_amount, transport: true });
+    }
+  }
+  return lines;
+}
+const clientOf = (key, list) => {
+  const [, type, who] = key.split('|');
+  if (type === 'ajf') return 'Asociația Județeană de Fotbal Alba';
+  if (type === 'club') return `AJF Alba (meciurile ${who})`;
+  return list[0].fee_payer || list[0].home_club;
+};
+function invoiceState(list) {
+  const no = list.find((m) => m.invoice_no)?.invoice_no;
+  if (list.every((m) => m.fee_paid)) return { cls: 'ok', text: 'Încasată' + (no ? ' · ' + no : '') };
+  if (no) return { cls: 'issued', text: 'Emisă ' + no + ', neîncasată' };
+  return { cls: '', text: 'Neemisă' };
 }
 
 function renderBarem() {
@@ -508,48 +563,21 @@ function renderBarem() {
   const paid = sumOf(played.filter((m) => m.fee_paid));
   const laterSum = sumOf(later);
   const missing = played.filter((m) => m.fee_amount === null || m.fee_amount === undefined).length;
-  const noFuel = played.some((m) => billingOf(m) !== 'ajf' && m.transport_amount == null);
+  const noFuel = played.some((m) => billingOf(m) !== 'ajf' && !m.transport_with && m.transport_amount == null);
 
-  // luni → facturi: AJF (una), FRF prin AJF (una pe club), FRF direct (pe meci)
+  // luni → facturi: AJF (una pe lună), FRF prin AJF (una pe club și lună), FRF direct (una pe club și zi)
   const months = new Map();
+  groups = new Map();
   for (const m of played.sort((a, b) => parseLocal(b.start_local) - parseLocal(a.start_local))) {
-    const d = parseLocal(m.start_local), k = monthKey(d);
-    if (!months.has(k)) months.set(k, { label: fmt.month(d), ajf: [], clubs: new Map(), frf: [] });
-    const g = months.get(k), b = billingOf(m);
-    if (b === 'ajf') g.ajf.push(m);
-    else if (b === 'ajf_club') {
-      const c = m.fee_payer || m.home_club;
-      if (!g.clubs.has(c)) g.clubs.set(c, []);
-      g.clubs.get(c).push(m);
-    } else g.frf.push(m);
+    const d = parseLocal(m.start_local), k = monthKey(d), b = billingOf(m);
+    if (!months.has(k)) months.set(k, { label: fmt.month(d), keys: [] });
+    const key = b === 'ajf' ? `${k}|ajf`
+      : b === 'ajf_club' ? `${k}|club|${m.fee_payer || m.home_club}`
+      : `${k}|frf|${m.fee_payer || m.home_club}|${m.start_local.slice(0, 10)}`;
+    if (!groups.has(key)) { groups.set(key, []); months.get(k).keys.push(key); }
+    groups.get(key).push(m);
   }
-
-  const amountCell = (m, strike) => {
-    if (m.fee_amount === null || m.fee_amount === undefined) return '<span class="a missing">fără tarif</span>';
-    const tr = billingOf(m) !== 'ajf'
-      ? `<div class="w">${m.transport_with ? 'transport la ' + esc(leaderShort(m)) : m.transport_amount != null ? '+ ' + lei(m.transport_amount) + ' transport' : '+ transport (fără preț)'}</div>` : '';
-    return `<span class="a${strike ? ' paid-mark' : ''}">${leiR(m.fee_amount)}${tr}</span>`;
-  };
-  const matchLine = (m, sub) => {
-    const d = parseLocal(m.start_local);
-    return `<div data-id="${m.match_id}" role="button" tabindex="0">
-        <div>${d.getDate()} ${esc(d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
-        <div class="w">${sub}</div>
-      </div>`;
-  };
-  const invoice = (title, list, key) => {
-    const allPaid = list.every((m) => m.fee_paid);
-    const paidAt = allPaid && list[0].fee_paid_at ? new Date(list[0].fee_paid_at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '';
-    const fees = list.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-    const tr = list.reduce((s, m) => s + Number(m.transport_amount || 0), 0);
-    return `<div class="org"><span>${esc(title)}</span><span>${lei(fees + tr)}</span></div>
-      ${tr ? `<div class="w" style="padding:0 14px 4px">${lei(fees)} barem + ${lei(tr)} transport</div>` : ''}
-      ${list.map((m) => `<div class="fee-row">${matchLine(m, `${esc(m.competition)}, ${esc(roleLabel(m))}`)}${amountCell(m, false)}</div>`).join('')}
-      <div class="paybar">
-        <span class="st${allPaid ? ' ok' : ''}">${allPaid ? 'Încasat' + (paidAt ? ' pe ' + esc(paidAt) : '') : 'Neîncasat'}</span>
-        <button class="pay-btn${allPaid ? ' on' : ''}" type="button" data-group="${esc(key)}" data-paid="${allPaid ? '0' : '1'}">${allPaid ? 'Anulează încasarea' : 'Marchează încasat'}</button>
-      </div>`;
-  };
+  const order = (key) => key.includes('|ajf') ? 0 : key.includes('|club|') ? 1 : 2;
 
   let html = `
     <div class="owed">
@@ -560,32 +588,119 @@ function renderBarem() {
       ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului mai jos.</div>' : ''}
     </div>`;
 
-  groups = new Map();
-  for (const [k, g] of months) {
-    const all = [...g.ajf, ...[...g.clubs.values()].flat(), ...g.frf];
+  for (const [, g] of months) {
+    const keys = g.keys.sort((a, b) => order(a) - order(b));
+    const all = keys.flatMap((k) => groups.get(k));
     html += `<h2 class="month">${esc(g.label)}</h2><div class="mblock">
-      <div class="mhead"><h3>${all.length} ${all.length === 1 ? 'meci' : 'meciuri'}</h3><span class="sum">${leiR(sumOf(all))}</span></div>`;
-    if (g.ajf.length) {
-      const key = `${k}|ajf`; groups.set(key, g.ajf);
-      html += invoice('Factură AJF Alba', g.ajf, key);
-    }
-    for (const [club, list] of g.clubs) {
-      const key = `${k}|club|${club}`; groups.set(key, list);
-      html += invoice(`Factură AJF pentru ${club}`, list, key);
-    }
-    if (g.frf.length) {
-      html += `<div class="org"><span>FRF direct, pe meci</span><span>${lei(sumOf(g.frf))}</span></div>
-        ${g.frf.map((m) => `
-          <div class="fee-row"><div class="frf-pay">
-            <input type="checkbox" data-pay="${m.match_id}" ${m.fee_paid ? 'checked' : ''} aria-label="Încasat ${esc(m.home_club)} – ${esc(m.away_club)}">
-            ${matchLine(m, 'Plătește ' + esc(m.fee_payer || m.home_club))}
-          </div>${amountCell(m, m.fee_paid)}</div>`).join('')}<div style="height:6px"></div>`;
+      <div class="mhead"><h3>${all.length} ${all.length === 1 ? 'meci' : 'meciuri'}, ${keys.length} ${keys.length === 1 ? 'factură' : 'facturi'}</h3><span class="sum">${leiR(sumOf(all))}</span></div>`;
+    for (const key of keys) {
+      const list = groups.get(key);
+      const st = invoiceState(list);
+      const type = key.split('|')[1];
+      const title = type === 'ajf' ? 'AJF Alba, toată luna'
+        : type === 'club' ? `AJF pentru ${key.split('|')[2]}`
+        : `${list[0].fee_payer || list[0].home_club}, ${parseLocal(list[0].start_local).getDate()} ${fmt.month(parseLocal(list[0].start_local)).split(' ')[0].toLowerCase()}`;
+      const sub = list.length === 1
+        ? `${list[0].home_club} – ${list[0].away_club}${ageSuffix(list[0])}`
+        : `${list.length} meciuri` + (list.some((m) => Number(m.transport_amount) > 0) ? ' + transport' : '');
+      html += `
+        <button class="inv" type="button" data-invoice="${esc(key)}">
+          <span class="inv-l"><b>${esc(title)}</b><span>${esc(sub)}</span><span class="inv-st ${st.cls}">${esc(st.text)}</span></span>
+          <span class="inv-r">${lei(sumOf(list))}</span>
+        </button>`;
     }
     html += '</div>';
   }
   $('#view').innerHTML = html + settingsBox();
 }
-let groups = new Map();
+
+/* ---------- foaia unei facturi ---------- */
+function openInvoice(key, { push = true } = {}) {
+  const list = groups.get(key);
+  if (!list) return;
+  const lines = invoiceLines(list);
+  const total = lines.reduce((s, l) => s + Number(l.price || 0), 0);
+  const st = invoiceState(list);
+  const no = list.find((m) => m.invoice_no)?.invoice_no || '';
+  const date = list.find((m) => m.invoice_date)?.invoice_date || '';
+  const allPaid = list.every((m) => m.fee_paid);
+  const sh = $('#sheet');
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="inv-head">
+        <div><span>Client</span><b id="sheetTitle">${esc(clientOf(key, list))}</b></div>
+        <div class="inv-total"><span>Total plată</span><b>${money2(total).replace('.', ',')} lei</b></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Produse și servicii</h2>
+      <ol class="lines">
+        ${lines.map((l) => `
+          <li${l.price == null ? ' class="missing"' : ''}>
+            <div class="ln-main"><b>${esc(l.name)}</b><span>${esc(l.desc)}</span>
+              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? 'fără tarif' : money2(l.price) + ' lei'}${l.transport ? ` · ${String(l.m.transport_km ?? '').replace('.', ',')} km` : ''}</span></div>
+            <div class="ln-val">${l.price == null ? '–' : money2(l.price)}</div>
+          </li>`).join('')}
+      </ol>
+      <button class="add-btn" type="button" id="copyLines">Copiază rândurile pentru SmartBill</button>
+      <p class="fee-hint" style="margin-top:8px">Rândurile de transport se schimbă din foaia meciului (km, preț, traseu).</p>
+
+      <h2>Evidență</h2>
+      <form class="mine" id="invForm">
+        <div class="two">
+          <label>Număr factură <input type="text" id="iNo" value="${esc(no)}" placeholder="ex. TB0005" autocapitalize="characters"></label>
+          <label>Data emiterii <input type="date" id="iDate" value="${esc(date || '')}"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="iPaid" ${allPaid ? 'checked' : ''}> Încasată</label>
+        <div class="fee-hint">Stare: ${esc(st.text)}.</div>
+        <button class="primary" type="submit" id="iSave">Salvează</button>
+      </form>
+
+      <h2>Meciurile de pe factură</h2>
+      <div class="mblock">
+        ${[...list].sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local)).map((m) => `
+          <div class="fee-row"><div data-id="${m.match_id}" role="button" tabindex="0">
+            <div>${parseLocal(m.start_local).getDate()} ${esc(parseLocal(m.start_local).toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
+            <div class="w">${esc(m.competition)}, ${esc(roleLabel(m))}</div>
+          </div><span class="a">${m.fee_amount == null ? '<span class="missing">fără tarif</span>' : leiR(totalOf(m))}</span></div>`).join('')}
+      </div>
+    </div>`;
+  sh.classList.remove('hidden');
+  if (push) {
+    sh.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ sheet: 'inv' }, '');
+  }
+  $('#back').onclick = () => history.back();
+
+  $('#copyLines').onclick = async () => {
+    const text = lines.map((l, i) => [i + 1, l.name, l.desc, l.um, l.qty, l.price == null ? '' : money2(l.price), l.price == null ? '' : money2(l.price * l.qty)].join('\t')).join('\n')
+      + `\n\tTOTAL PLATĂ\t\t\t\t\t${money2(total)}`;
+    try { await navigator.clipboard.writeText(text); toast('Rânduri copiate'); }
+    catch { toast('Nu am putut copia. Selectează textul manual.'); }
+  };
+
+  $('#invForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = $('#iSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
+    const patch = { invoice_no: $('#iNo').value.trim().toUpperCase() || null, invoice_date: $('#iDate').value || null };
+    if ($('#iPaid').checked !== allPaid) patch.fee_paid = $('#iPaid').checked;
+    if (patch.invoice_no && !patch.invoice_date) patch.invoice_date = localIso(new Date()).slice(0, 10);
+    const ids = list.map((m) => m.match_id);
+    const { data, error } = await sb.from('matches').update(patch).in('match_id', ids).select('match_id, invoice_no, invoice_date, fee_paid, fee_paid_at');
+    btn.disabled = false; btn.textContent = 'Salvează';
+    if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+    for (const r of data && data.length ? data : ids.map((id) => ({ match_id: id, ...patch }))) Object.assign(matches.find((m) => m.match_id === r.match_id) || {}, r);
+    store.set('meciuri_cache', matches);
+    toast('Factură salvată');
+    render();
+    const top = sh.scrollTop; openInvoice(key, { push: false }); sh.scrollTop = top;
+  };
+}
 
 function settingsBox() {
   return `
@@ -599,7 +714,10 @@ function settingsBox() {
           <input type="number" id="sPrice" step="0.01" min="0" inputmode="decimal" value="${settings.pret_carburant ?? ''}" placeholder="ex. 7,80">
         </label>
       </div>
-      <div class="fee-hint">Transport = km dus-întors × consum × preț. Prețul de pe un bon anume îl pui în foaia meciului.</div>
+      <label>Plec din
+        <input type="text" id="sFrom" value="${esc(settings.localitate_plecare || '')}" placeholder="ex. Ocna Mures">
+      </label>
+      <div class="fee-hint">Transport = (km dus-întors / 100) × consum × preț. Km reali și prețul de pe bon le pui în foaia meciului.</div>
       <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
     </form>`;
 }
@@ -608,28 +726,17 @@ async function saveSettings(ev) {
   ev.preventDefault();
   const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
   const btn = $('#sSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
-  const rows = [['consum_l_100km', num($('#sCons').value)], ['pret_carburant', num($('#sPrice').value)]];
+  const rows = [['consum_l_100km', { value: num($('#sCons').value) }], ['pret_carburant', { value: num($('#sPrice').value) }],
+                ['localitate_plecare', { text_value: $('#sFrom').value.trim() || null }]];
   let err = null;
-  for (const [key, value] of rows) {
-    const { error } = await sb.from('settings').update({ value }).eq('key', key);
-    if (error) err = error; else settings[key] = value;
+  for (const [key, patch] of rows) {
+    const { error } = await sb.from('settings').update(patch).eq('key', key);
+    if (error) err = error; else settings[key] = Object.values(patch)[0];
   }
   store.set('meciuri_settings', settings);
   if (err) { toast('Nu s-a salvat: ' + err.message); btn.disabled = false; btn.textContent = 'Salvează și recalculează'; return; }
   await loadFromDb();
   toast('Transport recalculat');
-  render();
-}
-
-async function setGroupPaid(key, paid) {
-  const list = groups.get(key) || [];
-  const ids = list.map((m) => m.match_id);
-  if (!ids.length) return;
-  const { data, error } = await sb.from('matches').update({ fee_paid: paid }).in('match_id', ids).select('match_id, fee_paid, fee_paid_at');
-  if (error) { toast('Nu s-a salvat: ' + error.message); render(); return; }
-  for (const r of data || []) Object.assign(matches.find((m) => m.match_id === r.match_id) || {}, r);
-  store.set('meciuri_cache', matches);
-  toast(paid ? 'Factura marcată ca încasată' : 'Încasarea a fost anulată');
   render();
 }
 
@@ -867,6 +974,9 @@ function openMatch(id, { push = true } = {}) {
               <input type="number" id="fFuel" step="0.01" min="0" inputmode="decimal" value="${m.fuel_price ?? ''}" placeholder="${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' (implicit)' : 'nesetat'}">
             </label>
           </div>
+          <label>Traseu (apare pe factură)
+            <input type="text" id="fRoute" value="${esc(m.transport_route || '')}" placeholder="${esc(routeOf(m))}">
+          </label>
           <div class="fee-hint">${m.transport_amount != null
             ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>.`
             : 'Transportul se calculează după ce pui km și prețul carburantului.'}
@@ -960,6 +1070,8 @@ function openMatch(id, { push = true } = {}) {
       const km = num($('#fKm').value), fuel = num($('#fFuel').value);
       if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
       if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
+      const route = $('#fRoute').value.trim() || null;
+      if (route !== (m.transport_route || null)) patch.transport_route = route;
     }
     if ($('#fSep') && $('#fSep').checked !== !!m.transport_separate) patch.transport_separate = $('#fSep').checked;
     if (billingOf(m) === 'frf') {
@@ -1013,8 +1125,8 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (e.target.closest('input[data-pay]')) return;
-  const gb = e.target.closest('button[data-group]');
-  if (gb) { gb.disabled = true; setGroupPaid(gb.dataset.group, gb.dataset.paid === '1'); return; }
+  const inv = e.target.closest('button[data-invoice]');
+  if (inv) { openInvoice(inv.dataset.invoice); return; }
   if (e.target.closest('#addMatch')) { openAdd(); return; }
   const item = e.target.closest('[data-id]');
   if (item) { openMatch(item.dataset.id); return; }
