@@ -109,8 +109,8 @@
     background: var(--chalk); padding: 10px 16px; border-bottom: 1px solid var(--rule);
   }
   .tabs button {
-    flex: 1; border: 0; background: transparent; padding: 9px 4px; border-radius: 8px;
-    font-family: var(--display); font-weight: 600; font-size: 18px; color: var(--muted); cursor: pointer;
+    flex: 1; border: 0; background: transparent; padding: 9px 2px; border-radius: 8px;
+    font-family: var(--display); font-weight: 600; font-size: 17px; color: var(--muted); cursor: pointer;
   }
   .tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 -3px 0 var(--pitch-2); }
   @media (prefers-color-scheme: dark) { .tabs button[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--yellow); } }
@@ -149,6 +149,47 @@
   .bar i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--rule); position: relative; overflow: hidden; }
   .bar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--pitch-2); border-radius: 4px; }
   @media (prefers-color-scheme: dark) { .bar i::after { background: var(--yellow); } }
+
+  /* ---------- barem ---------- */
+  .owed { margin-top: 18px; background: var(--paper); border-radius: 12px; padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  .owed b { display: block; font-family: var(--display); font-weight: 700; font-size: 38px; line-height: 1; }
+  .owed span { font-size: 14px; color: var(--muted); }
+  .owed .due b { color: var(--red); }
+  .owed .due.zero b { color: var(--ink); }
+  .owed .later { grid-column: 1 / -1; font-size: 14px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 6px; }
+  .mblock { background: var(--paper); border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+  .mhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 14px 4px; }
+  .mhead h3 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 20px; }
+  .mhead .sum { font-family: var(--display); font-weight: 700; font-size: 24px; white-space: nowrap; }
+  .org { font-size: 14px; font-weight: 600; color: var(--muted); padding: 10px 14px 2px; display: flex; justify-content: space-between; gap: 10px; }
+  .fee-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; width: 100%; text-align: left;
+    background: transparent; border: 0; border-top: 1px solid var(--rule); padding: 10px 14px; cursor: pointer; font-size: 15px; }
+  .fee-row:first-of-type { border-top: 0; }
+  .fee-row .w { color: var(--muted); font-size: 13.5px; }
+  .fee-row .a { font-weight: 600; white-space: nowrap; text-align: right; }
+  .fee-row .a.missing { color: var(--red); }
+  .paybar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 14px; }
+  .paybar .st { font-size: 14px; color: var(--muted); }
+  .paybar .st.ok { color: var(--pitch-2); font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .paybar .st.ok { color: var(--yellow); } }
+  .pay-btn { flex: none; border: 1.5px solid var(--pitch-2); background: transparent; color: var(--ink); border-radius: 999px;
+    height: 38px; padding: 0 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .pay-btn.on { background: var(--pitch-2); color: #f3f5f1; }
+  @media (prefers-color-scheme: dark) { .pay-btn { border-color: var(--yellow); } .pay-btn.on { background: var(--yellow); color: var(--yellow-ink); } }
+  .frf-pay { display: flex; align-items: center; gap: 10px; }
+  .frf-pay input { width: 24px; height: 24px; accent-color: var(--pitch-2); flex: none; }
+  .paid-mark { text-decoration: line-through; text-decoration-color: var(--muted); color: var(--muted); }
+
+  .fee-hint { font-size: 13.5px; color: var(--muted); margin-top: -6px; }
+  .fee-hint button { border: 0; background: transparent; padding: 0; color: var(--ink); text-decoration: underline; font-size: 13.5px; cursor: pointer; }
+  .seg { display: flex; gap: 6px; }
+  .seg label { flex: 1; display: block; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 9px 4px; border-radius: 8px; border: 1.5px solid var(--rule); color: var(--ink); font-weight: 600; cursor: pointer; }
+  .seg input:checked + span { border-color: var(--pitch-2); background: var(--pitch-2); color: #f3f5f1; }
+  .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+  @media (prefers-color-scheme: dark) { .seg input:checked + span { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } }
+  .note { font-size: 14px; color: var(--muted); background: var(--chalk); border-radius: 8px; padding: 10px 12px; }
 
   /* ---------- foaia meciului (detalii) ---------- */
   .sheet {
@@ -261,6 +302,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="upcoming" aria-selected="true">Urmează</button>
     <button role="tab" data-tab="played" aria-selected="false">Jucate</button>
+    <button role="tab" data-tab="barem" aria-selected="false">Barem</button>
     <button role="tab" data-tab="stats" aria-selected="false">Statistici</button>
   </nav>
 
@@ -418,7 +460,115 @@ function render() {
   $('#syncState').textContent = ago(lastSync);
   renderNext();
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  if (tab === 'stats') renderStats(); else renderList();
+  if (tab === 'stats') renderStats();
+  else if (tab === 'barem') renderBarem();
+  else renderList();
+}
+
+/* ---------- barem ---------- */
+const pad = (n) => String(n).padStart(2, '0');
+const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+const lei = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
+const isFrf = (m) => m.organizer === 'FRF';
+const counts = (m) => m.status === 'activ';
+
+function renderBarem() {
+  const played = matches.filter((m) => counts(m) && !isUpcoming(m));
+  const later = matches.filter((m) => counts(m) && isUpcoming(m));
+  if (!played.length && !later.length) {
+    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>';
+    return;
+  }
+  const due = played.filter((m) => !m.fee_paid).reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+  const paid = played.filter((m) => m.fee_paid).reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+  const laterSum = later.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+  const missing = played.filter((m) => m.fee_amount === null || m.fee_amount === undefined).length;
+
+  // grupare pe luni, cele mai recente primele
+  const months = new Map();
+  for (const m of played.sort((a, b) => parseLocal(b.start_local) - parseLocal(a.start_local))) {
+    const d = parseLocal(m.start_local), k = monthKey(d);
+    if (!months.has(k)) months.set(k, { label: fmt.month(d), ajf: [], frf: [] });
+    months.get(k)[isFrf(m) ? 'frf' : 'ajf'].push(m);
+  }
+
+  const feeRow = (m, withCheck) => {
+    const d = parseLocal(m.start_local);
+    const amount = m.fee_amount === null || m.fee_amount === undefined
+      ? '<span class="a missing">fără tarif</span>'
+      : `<span class="a${withCheck && m.fee_paid ? ' paid-mark' : ''}">${lei(m.fee_amount)}</span>`;
+    const who = withCheck ? `Plătește ${esc(m.fee_payer || m.home_club)}` : `${esc(m.competition)}, ${esc(roleLabel(m))}`;
+    return `
+      <div class="fee-row" ${withCheck ? '' : `data-id="${m.match_id}" role="button" tabindex="0"`}>
+        <div class="${withCheck ? 'frf-pay' : ''}">
+          ${withCheck ? `<input type="checkbox" data-pay="${m.match_id}" ${m.fee_paid ? 'checked' : ''} aria-label="Încasat ${esc(m.home_club)} – ${esc(m.away_club)}">` : ''}
+          <div ${withCheck ? `data-id="${m.match_id}" role="button" tabindex="0"` : ''}>
+            <div>${d.getDate()} ${esc(d.toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
+            <div class="w">${who}</div>
+          </div>
+        </div>
+        ${amount}
+      </div>`;
+  };
+
+  let html = `
+    <div class="owed">
+      <div class="due${due ? '' : ' zero'}"><b>${lei(due)}</b><span>de încasat</span></div>
+      <div><b>${lei(paid)}</b><span>încasat</span></div>
+      ${laterSum ? `<div class="later">Încă ${lei(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
+      ${missing ? `<div class="later">${missing === 1 ? 'Un meci nu are' : missing + ' meciuri nu au'} tarif. Deschide-l și completează suma.</div>` : ''}
+    </div>`;
+
+  for (const [k, g] of months) {
+    const total = [...g.ajf, ...g.frf].reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+    html += `<h2 class="month">${esc(g.label)}</h2><div class="mblock">
+      <div class="mhead"><h3>${g.ajf.length + g.frf.length} ${g.ajf.length + g.frf.length === 1 ? 'meci' : 'meciuri'}</h3><span class="sum">${lei(total)}</span></div>`;
+    if (g.ajf.length) {
+      const ajfSum = g.ajf.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+      const allPaid = g.ajf.every((m) => m.fee_paid);
+      const paidAt = allPaid && g.ajf[0].fee_paid_at ? new Date(g.ajf[0].fee_paid_at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }) : '';
+      html += `<div class="org"><span>AJF Alba, plată lunară</span><span>${lei(ajfSum)}</span></div>
+        ${g.ajf.map((m) => feeRow(m, false)).join('')}
+        <div class="paybar">
+          <span class="st${allPaid ? ' ok' : ''}">${allPaid ? 'Încasat' + (paidAt ? ' pe ' + esc(paidAt) : '') : 'Neîncasat'}</span>
+          <button class="pay-btn${allPaid ? ' on' : ''}" type="button" data-month="${k}" data-paid="${allPaid ? '0' : '1'}">${allPaid ? 'Anulează încasarea' : 'Marchează încasat'}</button>
+        </div>`;
+    }
+    if (g.frf.length) {
+      const frfSum = g.frf.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+      html += `<div class="org"><span>FRF, plată pe meci</span><span>${lei(frfSum)}</span></div>
+        ${g.frf.map((m) => feeRow(m, true)).join('')}<div style="height:6px"></div>`;
+    }
+    html += '</div>';
+  }
+  $('#view').innerHTML = html;
+}
+
+async function setMonthPaid(key, paid) {
+  const [y, mo] = key.split('-').map(Number);
+  const from = localIso(new Date(y, mo - 1, 1));
+  const to = localIso(new Date(y, mo, 1));
+  const until = localIso(new Date(Math.min(Date.now() - 2 * 3600 * 1000, new Date(y, mo, 1).getTime())));
+  const { data, error } = await sb.from('matches')
+    .update({ fee_paid: paid })
+    .eq('organizer', 'AJF').eq('status', 'activ')
+    .gte('start_local', from).lt('start_local', to).lte('start_local', until)
+    .select('match_id, fee_paid, fee_paid_at');
+  if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+  for (const r of data || []) Object.assign(matches.find((m) => m.match_id === r.match_id) || {}, r);
+  store.set('meciuri_cache', matches);
+  toast(paid ? 'Luna marcată ca încasată' : 'Încasarea a fost anulată');
+  render();
+}
+
+async function setMatchPaid(id, paid) {
+  const { data, error } = await sb.from('matches').update({ fee_paid: paid }).eq('match_id', id).select('match_id, fee_paid, fee_paid_at');
+  if (error) { toast('Nu s-a salvat: ' + error.message); render(); return; }
+  Object.assign(matches.find((m) => m.match_id === id) || {}, data?.[0] || { fee_paid: paid });
+  store.set('meciuri_cache', matches);
+  toast(paid ? 'Încasat' : 'Marcat neîncasat');
+  render();
 }
 
 function renderNext() {
@@ -462,7 +612,7 @@ function renderList() {
         <div class="day"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', ''))}</span></div>
         <div>
           <div class="t">${esc(m.home_club)} <i>–</i> ${esc(m.away_club)}</div>
-          <div class="s">${esc(m.competition)}, ${esc(roleLabel(m))}</div>
+          <div class="s">${esc(m.competition)}, ${esc(roleLabel(m))}${m.fee_amount !== null && m.fee_amount !== undefined && !cancelled ? ', ' + lei(m.fee_amount) : ''}</div>
         </div>
         ${score}
       </button>`;
@@ -501,7 +651,7 @@ function renderStats() {
 }
 
 /* ---------- foaia meciului ---------- */
-function openMatch(id) {
+function openMatch(id, { push = true } = {}) {
   const m = matches.find((x) => x.match_id === id);
   if (!m) return;
   const d = parseLocal(m.start_local);
@@ -539,47 +689,106 @@ function openMatch(id) {
       ${crew.length ? `<h2>Brigada</h2>
       <ul class="crew">${crew.map((o) => `<li class="${o.is_me ? 'me' : ''}"><span>${esc(o.first_name)} ${esc(o.last_name)}${o.is_me ? ' (eu)' : ''}</span><span class="r">${esc(officialRole(o))}</span></li>`).join('')}</ul>` : ''}
 
+      <h2>Barem</h2>
+      <form class="mine" id="feeForm">
+        <div class="seg" role="radiogroup" aria-label="Organizator">
+          <label><input type="radio" name="org" value="AJF" ${!isFrf(m) ? 'checked' : ''}><span>AJF Alba</span></label>
+          <label><input type="radio" name="org" value="FRF" ${isFrf(m) ? 'checked' : ''}><span>FRF</span></label>
+        </div>
+        <label>Suma (lei)
+          <input type="number" id="fFee" step="1" min="0" inputmode="decimal" value="${m.fee_amount ?? ''}" placeholder="Completează suma">
+        </label>
+        <div class="fee-hint">${feeHint(m)}</div>
+        ${isFrf(m) ? `
+          <label>Plătește
+            <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
+          </label>
+          <label class="check"><input type="checkbox" id="fPaid" ${m.fee_paid ? 'checked' : ''}> Încasat${m.fee_paid && m.fee_paid_at ? ' pe ' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') : ''}</label>`
+        : `<div class="note">${m.fee_paid ? 'Încasat odată cu luna' + (m.fee_paid_at ? ' (' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') + ')' : '') + '.' : 'Se încasează lunar. Marchezi plata din tab-ul Barem.'}</div>`}
+        <button class="primary" type="submit" id="fFeeSave">Salvează barem-ul</button>
+      </form>
+
       <h2>Notițele mele</h2>
       <form class="mine" id="mine">
         <label>Observații
           <textarea id="fNotes" placeholder="Teren, faze, ce a zis observatorul…">${esc(m.notes || '')}</textarea>
         </label>
-        <div class="two">
-          <label>Nota observatorului
-            <input type="number" id="fGrade" step="0.01" min="0" max="10" inputmode="decimal" value="${m.observer_grade ?? ''}">
-          </label>
-          <label>Barem (lei)
-            <input type="number" id="fFee" step="1" min="0" inputmode="decimal" value="${m.fee_amount ?? ''}">
-          </label>
-        </div>
-        <label class="check"><input type="checkbox" id="fPaid" ${m.fee_paid ? 'checked' : ''}> Barem încasat</label>
-        <button class="primary" type="submit" id="fSave">Salvează</button>
+        <label>Nota observatorului
+          <input type="number" id="fGrade" step="0.01" min="0" max="10" inputmode="decimal" value="${m.observer_grade ?? ''}">
+        </label>
+        <button class="primary" type="submit" id="fSave">Salvează notițele</button>
       </form>
     </div>`;
   sh.classList.remove('hidden');
-  sh.scrollTop = 0;
-  document.body.style.overflow = 'hidden';
-  $('#back').focus();
-  history.pushState({ sheet: id }, '');
+  if (push) {
+    sh.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    $('#back').focus();
+    history.pushState({ sheet: id }, '');
+  }
 
   $('#back').onclick = () => history.back();
-  $('#mine').onsubmit = async (ev) => {
-    ev.preventDefault();
-    const btn = $('#fSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
-    const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
-    const patch = {
-      notes: $('#fNotes').value.trim() || null,
-      observer_grade: num($('#fGrade').value),
-      fee_amount: num($('#fFee').value),
-      fee_paid: $('#fPaid').checked,
-    };
-    const { error } = await sb.from('matches').update(patch).eq('match_id', id);
-    btn.disabled = false; btn.textContent = 'Salvează';
-    if (error) { toast('Nu s-a salvat: ' + error.message); return; }
-    Object.assign(m, patch); store.set('meciuri_cache', matches);
-    toast('Salvat');
+  const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
+
+  async function save(patch, btn, label, msg) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Se salvează…'; }
+    const { data, error } = await sb.from('matches').update(patch).eq('match_id', id).select('*');
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (error) { toast('Nu s-a salvat: ' + error.message); return false; }
+    Object.assign(m, data?.[0] || patch);
+    store.set('meciuri_cache', matches);
+    toast(msg);
     render();
+    return true;
+  }
+
+  $('#mine').onsubmit = (ev) => {
+    ev.preventDefault();
+    save({ notes: $('#fNotes').value.trim() || null, observer_grade: num($('#fGrade').value) },
+      $('#fSave'), 'Salvează notițele', 'Notițe salvate');
   };
+
+  // schimbarea organizatorului se salvează imediat (AJF/FRF schimbă tariful și felul plății)
+  sh.querySelectorAll('input[name=org]').forEach((r) => r.onchange = async () => {
+    if (await save({ organizer: r.value, organizer_manual: true }, null, '', r.value === 'FRF' ? 'Mutat la FRF' : 'Mutat la AJF')) {
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  });
+
+  const reset = sh.querySelector('[data-reset-fee]');
+  if (reset) reset.onclick = async () => {
+    if (await save({ fee_manual: false }, null, '', 'Suma readusă la barem')) {
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  };
+
+  $('#feeForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const amount = num($('#fFee').value);
+    const patch = {};
+    if (amount !== (m.fee_amount === null || m.fee_amount === undefined ? null : Number(m.fee_amount))) {
+      patch.fee_amount = amount;
+      patch.fee_manual = amount !== null;   // gol = revino la barem
+    }
+    if (isFrf(m)) {
+      patch.fee_payer = $('#fPayer').value.trim() || null;
+      patch.fee_paid = $('#fPaid').checked;
+    }
+    if (!Object.keys(patch).length) { toast('Nimic de salvat'); return; }
+    if (await save(patch, $('#fFeeSave'), 'Salvează barem-ul', 'Barem salvat')) {
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  };
+}
+
+function feeHint(m) {
+  const split = m.fee_hg || m.fee_team
+    ? ` (${[m.fee_hg ? lei(m.fee_hg) + ' HG' : '', m.fee_team ? lei(m.fee_team) + ' echipă' : ''].filter(Boolean).join(' + ')})` : '';
+  if (m.fee_manual) return `Sumă pusă de tine. <button type="button" data-reset-fee>Revino la barem</button>`;
+  if (m.fee_label) return `Din barem-ul ${esc(m.organizer || 'AJF')} 26-27: ${esc(m.fee_label)}${split}.`;
+  return isFrf(m)
+    ? 'Tarifele FRF nu sunt încă în barem. Completează suma de mână.'
+    : 'Nu am găsit competiția în barem. Completează suma de mână.';
 }
 function closeSheet() {
   $('#sheet').classList.add('hidden');
@@ -588,7 +797,18 @@ function closeSheet() {
 window.addEventListener('popstate', () => { if (!$('#sheet').classList.contains('hidden')) closeSheet(); });
 
 /* ---------- evenimente ---------- */
+document.addEventListener('change', (e) => {
+  const p = e.target.closest('input[data-pay]');
+  if (p) setMatchPaid(p.dataset.pay, p.checked);
+});
+document.addEventListener('keydown', (e) => {
+  const item = e.target.closest('div[data-id][role=button]');
+  if (item && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openMatch(item.dataset.id); }
+});
 document.addEventListener('click', (e) => {
+  if (e.target.closest('input[data-pay]')) return;
+  const mb = e.target.closest('button[data-month]');
+  if (mb) { mb.disabled = true; setMonthPaid(mb.dataset.month, mb.dataset.paid === '1'); return; }
   const item = e.target.closest('[data-id]');
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
