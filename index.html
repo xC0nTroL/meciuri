@@ -217,6 +217,14 @@
   ol.lines li.missing .ln-val, .missing { color: var(--red); }
   .to-field { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .to-field input { padding: 8px 10px; font-size: 15px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 16px 0 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; border: 1.5px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 999px;
+    padding: 7px 12px; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .chips button span { color: var(--muted); font-weight: 500; margin-left: 2px; }
+  .chips button[aria-selected="true"] { background: var(--pitch-2); border-color: var(--pitch-2); color: #f3f5f1; }
+  .chips button[aria-selected="true"] span { color: #cfe0d8; }
+  @media (prefers-color-scheme: dark) { .chips button[aria-selected="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } .chips button[aria-selected="true"] span { color: var(--yellow-ink); } }
   .add-btn { display: block; width: 100%; margin-top: 16px; border: 1.5px dashed var(--muted); background: transparent; color: var(--ink);
     border-radius: 10px; height: 46px; font-weight: 600; font-size: 15px; cursor: pointer; }
   select { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); }
@@ -335,7 +343,7 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" data-tab="upcoming" aria-selected="true">Urmează</button>
-    <button role="tab" data-tab="played" aria-selected="false">Jucate</button>
+    <button role="tab" data-tab="played" aria-selected="false">Arbitrate</button>
     <button role="tab" data-tab="barem" aria-selected="false">Barem</button>
     <button role="tab" data-tab="stats" aria-selected="false">Statistici</button>
   </nav>
@@ -875,18 +883,45 @@ function renderNext() {
 }
 const cleanStadium = (s) => String(s || '').replace(/\s*\(.*\)\s*$/, '');
 
+const CATEGORIES = ['SuperLiga AJF', 'Liga 4', 'Liga 5', 'Juniori AJF', 'FRF', 'Cupe', 'Altele'];
+let playedCat = store.get('meciuri_cat', 'Toate');
+function categoryOf(m) {
+  const c = String(m.competition || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/^cupa/.test(c)) return 'Cupe';
+  if (m.organizer === 'FRF') return 'FRF';
+  if (/superliga/.test(c)) return 'SuperLiga AJF';
+  if (/^liga (4|iv)\b/.test(c)) return 'Liga 4';
+  if (/^liga (5|v)\b/.test(c)) return 'Liga 5';
+  if (/junior|junioar|\bu ?\d{1,2}\b|feminin|interliga/.test(c)) return 'Juniori AJF';
+  return 'Altele';
+}
+
 function renderList() {
   const view = $('#view');
   let list = matches.filter((m) => tab === 'upcoming' ? isUpcoming(m) : !isUpcoming(m));
   list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * (parseLocal(a.start_local) - parseLocal(b.start_local)));
   const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de mână</button>';
+
+  // categorii, doar la „Arbitrate"
+  let chips = '';
+  if (tab === 'played' && list.length) {
+    const cnt = {};
+    for (const m of list) { const c = categoryOf(m); cnt[c] = (cnt[c] || 0) + 1; }
+    const cats = CATEGORIES.filter((c) => cnt[c]);
+    if (!cats.includes(playedCat)) playedCat = 'Toate';
+    chips = `<div class="chips" role="tablist" aria-label="Categorii">
+      ${['Toate', ...cats].map((c) => `<button type="button" role="tab" data-cat="${esc(c)}" aria-selected="${c === playedCat}">${esc(c)} <span>${c === 'Toate' ? list.length : cnt[c]}</span></button>`).join('')}
+    </div>`;
+    if (playedCat !== 'Toate') list = list.filter((m) => categoryOf(m) === playedCat);
+  }
+
   if (!list.length) {
     view.innerHTML = (tab === 'upcoming'
       ? '<div class="empty"><b>Nimic programat</b>Apasă Verifică după ce primești mailul de delegare.</div>'
-      : '<div class="empty"><b>Niciun meci jucat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
+      : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
     return;
   }
-  let html = addBtn, month = '';
+  let html = chips + addBtn, month = '';
   for (const m of list) {
     const d = parseLocal(m.start_local);
     const mo = fmt.month(d);
@@ -1168,6 +1203,8 @@ document.addEventListener('click', (e) => {
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
   if (t) { tab = t.dataset.tab; render(); window.scrollTo({ top: $('.tabs').offsetTop }); return; }
+  const cat = e.target.closest('button[data-cat]');
+  if (cat) { playedCat = cat.dataset.cat; store.set('meciuri_cat', playedCat); renderList(); return; }
   const s = e.target.closest('button[data-season]');
   if (s) { renderStats.season = s.dataset.season; renderStats(); return; }
   if (e.target.closest('#logout')) logout();
