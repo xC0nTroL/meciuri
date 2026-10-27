@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Meciurile mele</title>
-<meta name="theme-color" content="#060607">
+<meta name="theme-color" content="#0c1019">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -446,6 +446,77 @@
   .login input { background: #0b0a0c; border-color: rgba(255,255,255,0.14); color: var(--ink); }
   .login .primary { background: var(--accent); color: var(--accent-ink); }
   .toast { background: #f4f2ef; color: #121113; }
+
+  /* =================== STICLĂ (peste tema Bilete) =================== */
+  :root {
+    --accent: #d9bf86; --accent-soft: #e8d3a6; --accent-ink: #1a1406; --pitch-2: #d9bf86; --yellow: #d9bf86; --yellow-ink: #1a1406; --focus: #d9bf86;
+    --chalk: #0c1019;
+    --paper: rgba(255,255,255,0.06);
+    --stub: rgba(255,255,255,0.045);
+    --ink: #f2f3f7; --muted: #959cab; --dim: #646b7a;
+    --glass-edge: rgba(255,255,255,0.12);
+    --glass-blur: blur(22px) saturate(140%);
+  }
+  body { background: var(--chalk); }
+  body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(420px 420px at 0% 0%, rgba(96,112,255,0.42), transparent 70%),
+      radial-gradient(380px 380px at 100% 45%, rgba(217,191,134,0.26), transparent 70%),
+      radial-gradient(460px 360px at 30% 100%, rgba(80,150,255,0.18), transparent 70%),
+      var(--chalk); }
+  .glass, .ticket, .msec-inv, .mblock, .owed, .stat, .bars, form.mine, dl.facts, .crew, ol.lines, .set-sec, .bottom-nav, .sync-btn {
+    background: var(--paper); border: 1px solid var(--glass-edge);
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+  .ticket, .msec-inv, .mblock, .owed, form.mine, dl.facts, .crew, ol.lines { box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+  .bottom-nav { background: rgba(22,26,38,0.72); box-shadow: 0 12px 34px rgba(0,0,0,0.45); }
+  .bottom-nav button[aria-selected="true"] { background: rgba(255,255,255,0.10); color: var(--ink); }
+  .bottom-nav button[aria-selected="true"] svg { color: var(--accent); }
+  .stub { border-right-color: rgba(255,255,255,0.14); }
+
+  .next-wrap { padding: 16px 0 6px; margin: 0; }
+  #next { padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .hero-card { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; color: var(--ink);
+    border-radius: 26px; padding: 18px; cursor: pointer; box-shadow: 0 18px 40px rgba(0,0,0,0.35); }
+  .hero-empty { color: var(--muted); text-align: center; padding: 26px 18px; cursor: default; line-height: 1.5; }
+  .hero-top { display: flex; justify-content: space-between; align-items: center; }
+  .hero-chip { font-size: 12px; font-weight: 600; color: var(--accent); padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(217,191,134,0.45); }
+  .hero-in { font-size: 12.5px; color: var(--muted); }
+  .hero-when { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+  .hero-time { font-size: 56px; font-weight: 300; letter-spacing: -2px; line-height: 0.95; }
+  .hero-date { font-size: 14px; font-weight: 500; color: var(--muted); padding-bottom: 6px; text-align: right; }
+  .hero-teams { font-size: 17px; font-weight: 600; line-height: 1.3; }
+  .hero-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hero-pills span { font-size: 12.5px; font-weight: 500; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.08); }
+  .month-card { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; color: var(--ink);
+    border-radius: 22px; padding: 16px 18px; cursor: pointer; }
+  .mc-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .mc-label { font-size: 15px; font-weight: 600; }
+  .mc-sum { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; color: var(--accent); }
+  .mc-bar { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.09); overflow: hidden; }
+  .mc-bar i { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+  .mc-foot { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero-card.raise, .month-card.raise { animation: rise .6s cubic-bezier(.2,.8,.2,1) both; }
+    .month-card.raise { animation-delay: .08s; }
+    .mc-bar i { animation: fill 1s .25s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes fill { from { width: 0; } }
+  }
+
+  .chips button { background: rgba(255,255,255,0.05); border-color: var(--glass-edge); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+  .tk-fee { color: var(--accent); }
+  .owed .due b, .inv-total b, .tk-score { color: var(--accent); }
+  .sheet { background: transparent; }
+  .sheet::before { content: ""; position: fixed; inset: 0; z-index: -1;
+    background: radial-gradient(420px 420px at 0% 0%, rgba(96,112,255,0.42), transparent 70%),
+      radial-gradient(380px 380px at 100% 45%, rgba(217,191,134,0.26), transparent 70%), var(--chalk); }
+  .sheet { isolation: isolate; }
+  .sheet-head { background: rgba(255,255,255,0.05); border-bottom: 1px solid var(--glass-edge);
+    backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+  input[type=text], input[type=number], input[type=email], input[type=password], input[type=date], input[type=time], textarea, select, .note {
+    background: rgba(0,0,0,0.22); border-color: var(--glass-edge); }
+  .login { background: radial-gradient(420px 420px at 0% 0%, rgba(96,112,255,0.45), transparent 70%),
+    radial-gradient(380px 380px at 100% 70%, rgba(217,191,134,0.3), transparent 70%), var(--chalk); }
+  .login input { background: rgba(255,255,255,0.06); border-color: var(--glass-edge); }
 </style>
 </head>
 <body>
@@ -485,7 +556,6 @@
       </button>
     </div>
     <div class="next-wrap">
-      <div class="pitch-glow" aria-hidden="true"><i class="pg-haze"></i><i class="pg-ring"></i><i class="pg-line"></i></div>
       <div id="next"></div>
     </div>
   </header>
@@ -1051,24 +1121,48 @@ function renderNext() {
   const up = matches.filter((m) => m.status === 'activ' && isUpcoming(m))
     .sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local));
   const el = $('#next');
-  document.querySelector('.next-wrap').classList.toggle('empty-next', !up.length);
-  if (!up.length) { el.innerHTML = '<div class="no-next">Nicio delegare viitoare.<br>Când primești una, apare aici.</div>'; return; }
-  const m = up[0], d = parseLocal(m.start_local);
   const first = !renderNext._shown; renderNext._shown = true;
-  const wd = d.toLocaleDateString('ro-RO', { weekday: 'long' });
-  const day = relDay(d);
-  const label = /^(Azi|Mâine)$/.test(day) ? day + ' · ' + fmt.dayMon(d) : wd + ' · ' + fmt.dayMon(d);
-  el.innerHTML = `
-    <button class="poster${first ? ' raise' : ''}" data-id="${m.match_id}" type="button">
-      <span class="team"><span class="crest">${esc(initials(m.home_club))}</span><span class="tname">${esc(m.home_club)}</span></span>
-      <span class="kick">
-        <span class="kick-day">${esc(label.toUpperCase())}</span>
-        <span class="kick-time">${fmt.time(d)}</span>
-        <span class="kick-meta">${esc(m.competition)} · ${esc(roleLabel(m))}</span>
-      </span>
-      <span class="team"><span class="crest">${esc(initials(m.away_club))}</span><span class="tname">${esc(m.away_club)}</span></span>
-    </button>
-    <div class="poster-foot">${esc(cleanStadium(m.stadium) || '')}${m.distance_km ? ' · ' + fmt.km(m.distance_km) : ''}</div>`;
+  let hero;
+  if (!up.length) {
+    hero = '<div class="glass hero-card hero-empty">Nicio delegare viitoare.<br>Când primești una, apare aici.</div>';
+  } else {
+    const m = up[0], d = parseLocal(m.start_local);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dd = new Date(d); dd.setHours(0, 0, 0, 0);
+    const days = Math.round((dd - today) / 86400000);
+    const inDays = days <= 0 ? 'azi' : days === 1 ? 'mâine' : `în ${days} zile`;
+    const wd = d.toLocaleDateString('ro-RO', { weekday: 'long' });
+    const pills = [m.competition, roleLabel(m), m.distance_km ? fmt.km(m.distance_km) : null].filter(Boolean);
+    hero = `
+      <button class="glass hero-card${first ? ' raise' : ''}" data-id="${m.match_id}" type="button">
+        <span class="hero-top"><span class="hero-chip">Următoarea delegare</span><span class="hero-in">${esc(inDays)}</span></span>
+        <span class="hero-when"><span class="hero-time">${fmt.time(d)}</span><span class="hero-date">${esc(wd[0].toUpperCase() + wd.slice(1))}, ${esc(fmt.dayMon(d))}</span></span>
+        <span class="hero-teams">${esc(m.home_club)} – ${esc(m.away_club)}</span>
+        <span class="hero-pills">${pills.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
+      </button>`;
+  }
+  el.innerHTML = hero + monthCard(first);
+}
+
+/* cardul lunii: total, încasat, bara de progres (luna curentă sau ultima cu meciuri) */
+function monthCard(first) {
+  const played = matches.filter((m) => m.status === 'activ' && !isUpcoming(m));
+  if (!played.length) return '';
+  const nowK = monthKey(new Date());
+  const keys = [...new Set(played.map((m) => monthKey(parseLocal(m.start_local))))].sort().reverse();
+  const k = keys.includes(nowK) ? nowK : keys[0];
+  const list = played.filter((m) => monthKey(parseLocal(m.start_local)) === k);
+  const total = list.reduce((s2, m) => s2 + totalOf(m), 0);
+  const paid = list.filter((m) => m.fee_paid).reduce((s2, m) => s2 + totalOf(m), 0);
+  const pct = total ? Math.round((paid / total) * 100) : 0;
+  const [y, mo] = k.split('-').map(Number);
+  const label = fmt.month(new Date(y, mo - 1, 1)).split(' ')[0];
+  return `
+    <button class="glass month-card${first ? ' raise' : ''}" type="button" data-tab="barem">
+      <span class="mc-top"><span class="mc-label">${esc(label)}</span><span class="mc-sum">${leiR(total)}</span></span>
+      <span class="mc-bar" role="img" aria-label="Încasat ${leiR(paid)} din ${leiR(total)}"><i style="width:${pct}%"></i></span>
+      <span class="mc-foot"><span>${leiR(paid)} încasați</span><span>${list.length} ${list.length === 1 ? 'meci' : 'meciuri'}</span></span>
+    </button>`;
 }
 const cleanStadium = (s) => String(s || '').replace(/\s*\(.*\)\s*$/, '');
 
@@ -1145,7 +1239,7 @@ function renderList() {
     for (const g of groups) {
       const isOpen = open.includes(g.k);
       const active = g.list.filter((m) => m.status === 'activ');
-      const sum = active.reduce((s2, m) => s2 + Number(m.fee_amount || 0), 0);
+      const sum = active.reduce((s2, m) => s2 + totalOf(m), 0);
       html += `
         <section class="msec${isOpen ? ' open' : ''}">
           <button class="msec-head" type="button" data-month="${g.k}" aria-expanded="${isOpen}">
