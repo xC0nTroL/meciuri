@@ -916,13 +916,14 @@ function renderList() {
   const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de mână</button>';
 
   // categorii, doar la „Arbitrate"
-  let chips = '';
+  let chips = '', chipsSig = '';
   if (tab === 'played' && list.length) {
     const cnt = {};
     for (const m of list) { const c = categoryOf(m); cnt[c] = (cnt[c] || 0) + 1; }
     const cats = CATEGORIES.filter((c) => cnt[c]);
     if (!cats.includes(playedCat)) playedCat = 'Toate';
-    chips = `<div class="chips" role="tablist" aria-label="Categorii">
+    chipsSig = ['Toate:' + list.length, ...cats.map((c) => c + ':' + cnt[c])].join('|');
+    chips = `<div class="chips" role="tablist" aria-label="Categorii" data-sig="${esc(chipsSig)}">
       ${['Toate', ...cats].map((c) => `<button type="button" role="tab" data-cat="${esc(c)}" aria-selected="${c === playedCat}">${esc(c)} <span>${c === 'Toate' ? list.length : cnt[c]}</span></button>`).join('')}
     </div>`;
     if (playedCat !== 'Toate') list = list.filter((m) => categoryOf(m) === playedCat);
@@ -951,7 +952,7 @@ function renderList() {
       </button>`;
   };
 
-  let html = chips + addBtn;
+  let html = addBtn;
   if (tab === 'played') {
     // luni care se deschid / închid
     const groups = [];
@@ -984,15 +985,18 @@ function renderList() {
       html += rowHtml(m);
     }
   }
-  view.innerHTML = html;
-  const chipsEl = $('.chips');
-  if (chipsEl) {
-    if (prevChipsX !== null) chipsEl.scrollLeft = prevChipsX;
-    const sel = chipsEl.querySelector('[aria-selected="true"]');
-    if (sel) {
-      const l = sel.offsetLeft - chipsEl.offsetLeft, r = l + sel.offsetWidth;
-      if (l < chipsEl.scrollLeft) chipsEl.scrollLeft = l - 8;
-      else if (r > chipsEl.scrollLeft + chipsEl.clientWidth) chipsEl.scrollLeft = r - chipsEl.clientWidth + 8;
+  // rândul de categorii NU se redesenează dacă e același: Safari pe iPhone i-ar reseta derularea
+  const existing = view.querySelector('.chips');
+  if (tab === 'played' && existing && existing.dataset.sig === chipsSig && view.querySelector('#listBody')) {
+    existing.querySelectorAll('[data-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.cat === playedCat)));
+    view.querySelector('#listBody').innerHTML = html;
+  } else {
+    view.innerHTML = chips + `<div id="listBody">${html}</div>`;
+    const chipsEl = view.querySelector('.chips');
+    if (chipsEl) {
+      if (prevChipsX !== null) chipsEl.scrollLeft = prevChipsX;
+      const sel = chipsEl.querySelector('[aria-selected="true"]');
+      if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
   if (prevChipsX !== null) window.scrollTo(0, prevY);
