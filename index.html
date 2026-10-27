@@ -1261,7 +1261,7 @@ document.addEventListener('click', (e) => {
   const item = e.target.closest('[data-id]');
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
-  if (t) { tab = t.dataset.tab; render(); window.scrollTo({ top: $('.tabs').offsetTop }); return; }
+  if (t) { tab = t.dataset.tab; render(); return; }
   const mh = e.target.closest('button[data-month]');
   if (mh) {
     let open = store.get('meciuri_open_months', null);
