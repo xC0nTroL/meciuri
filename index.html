@@ -145,6 +145,11 @@
   .stat { background: var(--paper); border-radius: 10px; padding: 14px; }
   .stat b { display: block; font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1; }
   .stat span { font-size: 14px; color: var(--muted); }
+  .stat small { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 12.5px; color: var(--muted); }
+  .stat small.up { color: #8fd19e; }
+  .stat-due b { color: var(--accent); }
+  .stat b em { font-style: normal; font-size: 0.55em; font-weight: 600; letter-spacing: 0; }
+  .stat b { white-space: nowrap; }
   .bars { background: var(--paper); border-radius: 10px; padding: 14px; margin-top: 8px; }
   .bars h3 { margin: 0 0 10px; font-family: var(--display); font-weight: 600; font-size: 19px; }
   .bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin-bottom: 10px; font-size: 14.5px; }
@@ -792,6 +797,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
 const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 const lei = (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' lei';
+const statLei = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + '<em> lei</em>';
 const leiR = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
 const money2 = (n) => Number(n || 0).toFixed(2);
 const isFrf = (m) => m.organizer === 'FRF';
@@ -877,7 +883,7 @@ function renderBarem() {
       <span class="mc-bar owed-bar" role="img" aria-label="Încasat ${pctPaid}% din total"><i style="width:${pctPaid}%"></i></span>
       ${laterSum ? `<div class="later">Încă ${leiR(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
       ${missing ? `<div class="later">${missing === 1 ? 'Un meci nu are' : missing + ' meciuri nu au'} tarif. Deschide-l și completează suma.</div>` : ''}
-      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului în Setări, jos.</div>' : ''}
+      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului din cheița de sus.</div>' : ''}
     </div>`;
 
   let openB = store.get('meciuri_open_barem', null);
@@ -1341,9 +1347,20 @@ function renderStats() {
   const by = (fn) => inSeason.reduce((acc, m) => { const k = fn(m); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
   const roles = by((m) => roleLabel(m).replace(/ \d$/, ''));
   const comps = by((m) => m.competition || 'Altele');
-  const km = inSeason.reduce((s, m) => s + Number(m.distance_km || 0), 0);
-  const fee = inSeason.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
-  const unpaid = inSeason.filter((m) => m.fee_amount && !m.fee_paid).reduce((s, m) => s + Number(m.fee_amount), 0);
+  // casete: sezon + rol, câștig luna asta, de încasat, meciuri luna asta vs luna trecută
+  const nowD = new Date(), thisK = monthKey(nowD), prevK = monthKey(new Date(nowD.getFullYear(), nowD.getMonth() - 1, 1));
+  const inMonth = (k) => played.filter((m) => monthKey(parseLocal(m.start_local)) === k);
+  const thisM = inMonth(thisK), prevM = inMonth(prevK);
+  const earned = sumOf(thisM.filter(counts));
+  const billed = played.filter(counts);
+  const dueAll = sumOf(billed.filter((m) => !m.fee_paid));
+  const invKey = (m) => { const k = monthKey(parseLocal(m.start_local)), b = billingOf(m);
+    return b === 'ajf' ? k + '|ajf' : b === 'ajf_club' ? `${k}|club|${m.fee_payer || m.home_club}` : `${k}|frf|${m.fee_payer || m.home_club}|${m.start_local.slice(0, 10)}`; };
+  const openInv = new Set(billed.filter((m) => !m.fee_paid).map(invKey)).size;
+  const central = roles['Central'] || 0, assist = inSeason.length - central;
+  const diff = thisM.length - prevM.length;
+  const monName = (d) => fmt.month(d).split(' ')[0].toLowerCase();
+  const prevName = monName(new Date(nowD.getFullYear(), nowD.getMonth() - 1, 1));
   const bars = (obj) => {
     const entries = Object.entries(obj).sort((a, b) => b[1] - a[1]);
     const max = Math.max(1, ...entries.map((e) => e[1]));
@@ -1352,10 +1369,10 @@ function renderStats() {
   $('#view').innerHTML = `
     ${seasons.length > 1 ? `<div class="tabs" style="position:static;border:0;padding:16px 0 0">${seasons.map((s) => `<button data-season="${esc(s)}" aria-selected="${s === season}">Sezon ${esc(s)}</button>`).join('')}</div>` : ''}
     <div class="stats-grid">
-      <div class="stat"><b>${inSeason.length}</b><span>meciuri jucate${season ? ' în ' + esc(season) : ''}</span></div>
-      <div class="stat"><b>${(roles['Central'] || 0)}</b><span>la centru</span></div>
-      <div class="stat"><b>${Math.round(km).toLocaleString('ro-RO')}</b><span>km până la terenuri (dus)</span></div>
-      <div class="stat"><b>${fee ? Math.round(fee).toLocaleString('ro-RO') : '–'}</b><span>${fee ? 'lei barem' + (unpaid ? `, ${fmt.money(unpaid)} neîncasați` : '') : 'lei barem (completezi la fiecare meci)'}</span></div>
+      <div class="stat"><b>${inSeason.length}</b><span>${inSeason.length === 1 ? 'meci' : 'meciuri'}${season ? ' în ' + esc(season) : ''}</span><small>${central} centru · ${assist} asistent</small></div>
+      <div class="stat"><b>${statLei(earned)}</b><span>câștigat în ${esc(monName(nowD))}</span><small>${thisM.length ? 'barem + transport' : 'niciun meci încă'}</small></div>
+      <div class="stat stat-due"><b>${statLei(dueAll)}</b><span>de încasat</span><small>${openInv ? (openInv === 1 ? '1 factură neîncasată' : openInv + ' facturi neîncasate') : 'totul e încasat'}</small></div>
+      <div class="stat"><b>${thisM.length}</b><span>${thisM.length === 1 ? 'meci' : 'meciuri'} în ${esc(monName(nowD))}</span><small class="${diff > 0 ? 'up' : diff < 0 ? 'down' : ''}">${diff === 0 ? 'la fel ca în ' + esc(prevName) : (diff > 0 ? '+' : '−') + Math.abs(diff) + ' față de ' + esc(prevName)}</small></div>
     </div>
     ${inSeason.length ? `
     <div class="bars"><h3>Pe competiții</h3>${bars(comps)}</div>
