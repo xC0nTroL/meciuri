@@ -725,7 +725,7 @@ function openInvoice(key, { push = true } = {}) {
 
 function settingsBox() {
   return `
-    <h2 class="month">Transport FRF</h2>
+    <h2 class="month">Setări barem și transport</h2>
     <form class="mine" id="setForm">
       <div class="two">
         <label>Consum (l / 100 km)
@@ -739,6 +739,12 @@ function settingsBox() {
         <input type="text" id="sFrom" value="${esc(settings.localitate_plecare || '')}" placeholder="ex. Ocna Mures">
       </label>
       <div class="fee-hint">Transport = (km dus-întors / 100) × consum × preț. Km reali și prețul de pe bon le pui în foaia meciului.</div>
+      <label>Barem la cupe (AJF)
+        <select id="sCup">
+          <option value="0" ${Number(settings.cupa_dupa_gazda) === 1 ? '' : 'selected'}>După liga echipei mai bine clasate</option>
+          <option value="1" ${Number(settings.cupa_dupa_gazda) === 1 ? 'selected' : ''}>După liga gazdei</option>
+        </select>
+      </label>
       <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
     </form>`;
 }
@@ -748,7 +754,8 @@ async function saveSettings(ev) {
   const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
   const btn = $('#sSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
   const rows = [['consum_l_100km', { value: num($('#sCons').value) }], ['pret_carburant', { value: num($('#sPrice').value) }],
-                ['localitate_plecare', { text_value: $('#sFrom').value.trim() || null }]];
+                ['localitate_plecare', { text_value: $('#sFrom').value.trim() || null }],
+                ['cupa_dupa_gazda', { value: Number($('#sCup').value) }]];
   let err = null;
   for (const [key, patch] of rows) {
     const { error } = await sb.from('settings').update(patch).eq('key', key);
