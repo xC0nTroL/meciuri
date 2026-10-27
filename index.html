@@ -908,6 +908,9 @@ function categoryOf(m) {
 
 function renderList() {
   const view = $('#view');
+  // păstrez poziția rândului de categorii și a paginii la redesenare
+  const prevChipsX = $('.chips') ? $('.chips').scrollLeft : null;
+  const prevY = window.scrollY;
   let list = matches.filter((m) => tab === 'upcoming' ? isUpcoming(m) : !isUpcoming(m));
   list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * (parseLocal(a.start_local) - parseLocal(b.start_local)));
   const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de mână</button>';
@@ -982,6 +985,17 @@ function renderList() {
     }
   }
   view.innerHTML = html;
+  const chipsEl = $('.chips');
+  if (chipsEl) {
+    if (prevChipsX !== null) chipsEl.scrollLeft = prevChipsX;
+    const sel = chipsEl.querySelector('[aria-selected="true"]');
+    if (sel) {
+      const l = sel.offsetLeft - chipsEl.offsetLeft, r = l + sel.offsetWidth;
+      if (l < chipsEl.scrollLeft) chipsEl.scrollLeft = l - 8;
+      else if (r > chipsEl.scrollLeft + chipsEl.clientWidth) chipsEl.scrollLeft = r - chipsEl.clientWidth + 8;
+    }
+  }
+  if (prevChipsX !== null) window.scrollTo(0, prevY);
 }
 
 function renderStats() {
