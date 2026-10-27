@@ -217,6 +217,16 @@
   ol.lines li.missing .ln-val, .missing { color: var(--red); }
   .to-field { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .to-field input { padding: 8px 10px; font-size: 15px; }
+  .msec { background: var(--paper); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+  .msec-head { display: grid; grid-template-columns: 1fr auto 18px; gap: 10px; align-items: center; width: 100%; text-align: left;
+    border: 0; background: transparent; padding: 14px; cursor: pointer; color: var(--ink); }
+  .msec-t { font-family: var(--display); font-weight: 600; font-size: 20px; }
+  .msec-m { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .chev { color: var(--muted); transition: transform .15s ease; }
+  .msec.open .chev { transform: rotate(90deg); }
+  .msec-body { padding: 0 8px 8px; }
+  .msec-body .row { background: var(--chalk); }
+  @media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
   .chips { display: flex; gap: 6px; overflow-x: auto; padding: 16px 0 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .chips::-webkit-scrollbar { display: none; }
   .chips button { flex: none; border: 1.5px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 999px;
@@ -921,16 +931,13 @@ function renderList() {
       : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
     return;
   }
-  let html = chips + addBtn, month = '';
-  for (const m of list) {
+  const rowHtml = (m) => {
     const d = parseLocal(m.start_local);
-    const mo = fmt.month(d);
-    if (mo !== month) { month = mo; html += `<h2 class="month">${esc(mo)}</h2>`; }
     const cancelled = m.status === 'anulat';
     const score = hasScore(m)
       ? `<div class="score">${m.home_goals}–${m.away_goals}</div>`
       : `<div class="score none">${cancelled ? '<span class="tag-red">Anulat</span>' : fmt.time(d)}</div>`;
-    html += `
+    return `
       <button class="row${cancelled ? ' cancelled' : ''}" data-id="${m.match_id}" type="button">
         <div class="day"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', ''))}</span></div>
         <div>
@@ -939,6 +946,40 @@ function renderList() {
         </div>
         ${score}
       </button>`;
+  };
+
+  let html = chips + addBtn;
+  if (tab === 'played') {
+    // luni care se deschid / închid
+    const groups = [];
+    for (const m of list) {
+      const d = parseLocal(m.start_local), k = monthKey(d);
+      if (!groups.length || groups[groups.length - 1].k !== k) groups.push({ k, label: fmt.month(d), list: [] });
+      groups[groups.length - 1].list.push(m);
+    }
+    let open = store.get('meciuri_open_months', null);
+    if (!Array.isArray(open)) open = [groups[0].k];          // implicit: luna cea mai recentă
+    for (const g of groups) {
+      const isOpen = open.includes(g.k);
+      const active = g.list.filter((m) => m.status === 'activ');
+      const sum = active.reduce((s2, m) => s2 + Number(m.fee_amount || 0), 0);
+      html += `
+        <section class="msec${isOpen ? ' open' : ''}">
+          <button class="msec-head" type="button" data-month="${g.k}" aria-expanded="${isOpen}">
+            <span class="msec-t">${esc(g.label)}</span>
+            <span class="msec-m">${active.length} ${active.length === 1 ? 'meci' : 'meciuri'}${sum ? ' · ' + leiR(sum) : ''}</span>
+            <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          ${isOpen ? `<div class="msec-body">${g.list.map(rowHtml).join('')}</div>` : ''}
+        </section>`;
+    }
+  } else {
+    let month = '';
+    for (const m of list) {
+      const mo = fmt.month(parseLocal(m.start_local));
+      if (mo !== month) { month = mo; html += `<h2 class="month">${esc(mo)}</h2>`; }
+      html += rowHtml(m);
+    }
   }
   view.innerHTML = html;
 }
@@ -1203,6 +1244,16 @@ document.addEventListener('click', (e) => {
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
   if (t) { tab = t.dataset.tab; render(); window.scrollTo({ top: $('.tabs').offsetTop }); return; }
+  const mh = e.target.closest('button[data-month]');
+  if (mh) {
+    let open = store.get('meciuri_open_months', null);
+    if (!Array.isArray(open)) open = [...document.querySelectorAll('.msec.open [data-month]')].map((b) => b.dataset.month);
+    const k = mh.dataset.month;
+    open = open.includes(k) ? open.filter((x) => x !== k) : [...open, k];
+    store.set('meciuri_open_months', open);
+    renderList();
+    return;
+  }
   const cat = e.target.closest('button[data-cat]');
   if (cat) { playedCat = cat.dataset.cat; store.set('meciuri_cat', playedCat); renderList(); return; }
   const s = e.target.closest('button[data-season]');
