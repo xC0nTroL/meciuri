@@ -487,6 +487,7 @@
   .hero-teams { font-size: 17px; font-weight: 600; line-height: 1.3; }
   .hero-pills { display: flex; flex-wrap: wrap; gap: 8px; }
   .hero-pills span { font-size: 12.5px; font-weight: 500; padding: 7px 11px; border-radius: 999px; background: rgba(255,255,255,0.08); }
+  #view > .month-card { margin-top: 16px; }
   .month-card { display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; color: var(--ink);
     border-radius: 22px; padding: 16px 18px; cursor: pointer; }
   .mc-top { display: flex; justify-content: space-between; align-items: baseline; }
@@ -792,6 +793,7 @@ function invoiceState(list) {
 }
 
 function renderBarem() {
+  setTimeout(() => { renderBarem._shown = true; }, 0);
   const played = matches.filter((m) => counts(m) && !isUpcoming(m));
   const later = matches.filter((m) => counts(m) && isUpcoming(m));
   if (!played.length && !later.length) {
@@ -818,7 +820,7 @@ function renderBarem() {
   }
   const order = (key) => key.includes('|ajf') ? 0 : key.includes('|club|') ? 1 : 2;
 
-  let html = `
+  let html = monthCard(!renderBarem._shown) + `
     <div class="owed">
       <div class="due${due ? '' : ' zero'}"><b>${leiR(due)}</b><span>de încasat</span></div>
       <div><b>${leiR(paid)}</b><span>încasat</span></div>
@@ -1122,10 +1124,10 @@ function renderNext() {
     .sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local));
   const el = $('#next');
   const first = !renderNext._shown; renderNext._shown = true;
-  let hero;
-  if (!up.length) {
-    hero = '<div class="glass hero-card hero-empty">Nicio delegare viitoare.<br>Când primești una, apare aici.</div>';
-  } else {
+  const wrap = document.querySelector('.next-wrap');
+  wrap.classList.toggle('hidden', !up.length);
+  let hero = '';
+  if (up.length) {
     const m = up[0], d = parseLocal(m.start_local);
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const dd = new Date(d); dd.setHours(0, 0, 0, 0);
@@ -1141,7 +1143,7 @@ function renderNext() {
         <span class="hero-pills">${pills.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
       </button>`;
   }
-  el.innerHTML = hero + monthCard(first);
+  el.innerHTML = hero;
 }
 
 /* cardul lunii: total, încasat, bara de progres (luna curentă sau ultima cu meciuri) */
@@ -1158,11 +1160,11 @@ function monthCard(first) {
   const [y, mo] = k.split('-').map(Number);
   const label = fmt.month(new Date(y, mo - 1, 1)).split(' ')[0];
   return `
-    <button class="glass month-card${first ? ' raise' : ''}" type="button" data-tab="barem">
+    <div class="glass month-card${first ? ' raise' : ''}">
       <span class="mc-top"><span class="mc-label">${esc(label)}</span><span class="mc-sum">${leiR(total)}</span></span>
       <span class="mc-bar" role="img" aria-label="Încasat ${leiR(paid)} din ${leiR(total)}"><i style="width:${pct}%"></i></span>
       <span class="mc-foot"><span>${leiR(paid)} încasați</span><span>${list.length} ${list.length === 1 ? 'meci' : 'meciuri'}</span></span>
-    </button>`;
+    </div>`;
 }
 const cleanStadium = (s) => String(s || '').replace(/\s*\(.*\)\s*$/, '');
 
