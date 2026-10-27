@@ -1,0 +1,1369 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meciurile mele (clasic)</title>
+<meta name="theme-color" content="#103a2c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meciuri">
+<link rel="manifest" href="../manifest.json">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pitch: #103a2c;        /* gazon închis */
+    --pitch-2: #1b5040;
+    --line: #2a5c4a;         /* linii de teren */
+    --chalk: #f3f5f1;        /* alb de var */
+    --paper: #ffffff;
+    --ink: #13201b;
+    --muted: #5d6e66;
+    --rule: #dfe5e0;
+    --yellow: #f2c230;       /* cartonaș galben */
+    --yellow-ink: #2a2000;
+    --red: #d6352b;          /* cartonaș roșu */
+    --focus: #f2c230;
+    --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --body: "Barlow", system-ui, sans-serif;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --chalk: #0d1a15;
+      --paper: #14241e;
+      --ink: #e8efea;
+      --muted: #93a69d;
+      --rule: #23382f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.45;
+    color: var(--ink);
+    background: var(--chalk);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .hidden { display: none !important; }
+
+  /* ---------- antet: bucata de teren ---------- */
+  .top {
+    background: var(--pitch);
+    color: #f3f5f1;
+    padding: calc(var(--safe-top) + 18px) 16px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .top::before {               /* linia de centru + cercul, discret */
+    content: ""; position: absolute; left: 50%; top: -120px; width: 300px; height: 300px;
+    margin-left: -150px; border: 2px solid var(--line); border-radius: 50%;
+  }
+  .top-row { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .top h1 { font-family: var(--display); font-weight: 700; font-size: 32px; line-height: 1; margin: 0; letter-spacing: .2px; }
+  .sync-state { font-size: 13px; color: #b6cbc1; margin-top: 4px; }
+  .sync-btn {
+    flex: none; border: 1.5px solid #4e7c6a; background: transparent; color: #f3f5f1;
+    border-radius: 999px; height: 40px; padding: 0 16px; font-weight: 600; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .sync-btn svg { width: 16px; height: 16px; }
+  .sync-btn.busy svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- cartonașul: următoarea delegare ---------- */
+  .next-wrap { position: relative; padding: 22px 0 26px; }
+  .card {
+    display: block; width: 100%; text-align: left; border: 0; cursor: pointer;
+    background: var(--yellow); color: var(--yellow-ink);
+    border-radius: 14px; padding: 18px 18px 16px;
+    transform: rotate(-1.6deg);
+    box-shadow: 0 10px 24px rgba(0,0,0,.28);
+  }
+  .card .when { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: .95; }
+  .card .when small { font-size: 22px; font-weight: 600; margin-left: 6px; }
+  .card .teams { font-family: var(--display); font-weight: 600; font-size: 22px; line-height: 1.1; margin-top: 10px; }
+  .card .meta { font-size: 14px; margin-top: 8px; opacity: .82; }
+  .card .role { display: inline-block; margin-top: 12px; font-weight: 600; font-size: 14px;
+    border: 1.5px solid var(--yellow-ink); border-radius: 6px; padding: 2px 8px; }
+  .no-next { color: #b6cbc1; padding: 4px 0 8px; font-size: 15px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .card.raise { animation: raise .5s cubic-bezier(.2,.9,.3,1.2) both; }
+    @keyframes raise { from { transform: translateY(40px) rotate(4deg); opacity: 0; } to { transform: rotate(-1.6deg); opacity: 1; } }
+  }
+
+  /* ---------- tab-uri ---------- */
+  .tabs {
+    position: sticky; top: 0; z-index: 5; display: flex; gap: 4px;
+    background: var(--chalk); padding: 10px 16px; border-bottom: 1px solid var(--rule);
+  }
+  .tabs button {
+    flex: 1; border: 0; background: transparent; padding: 9px 2px; border-radius: 8px;
+    font-family: var(--display); font-weight: 600; font-size: 17px; color: var(--muted); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: inset 0 -3px 0 var(--pitch-2); }
+  @media (prefers-color-scheme: dark) { .tabs button[aria-selected="true"] { box-shadow: inset 0 -3px 0 var(--yellow); } }
+
+  main { padding: 0 16px calc(var(--safe-bot) + 32px); max-width: 680px; margin: 0 auto; }
+
+  /* ---------- lista de meciuri ---------- */
+  .month { font-family: var(--display); font-weight: 600; font-size: 17px; color: var(--muted); margin: 22px 0 6px; }
+  .row {
+    display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center;
+    width: 100%; text-align: left; background: var(--paper); border: 0; cursor: pointer;
+    padding: 12px 14px 12px 10px; border-radius: 10px; margin-bottom: 6px;
+  }
+  .day { text-align: center; line-height: 1; }
+  .day b { display: block; font-family: var(--display); font-weight: 700; font-size: 28px; }
+  .day span { font-size: 12px; color: var(--muted); }
+  .row .t { font-weight: 600; font-size: 15.5px; line-height: 1.25; }
+  .row .t i { font-style: normal; color: var(--muted); font-weight: 400; padding: 0 2px; }
+  .row .s { font-size: 13.5px; color: var(--muted); margin-top: 3px; }
+  .score { font-family: var(--display); font-weight: 700; font-size: 24px; letter-spacing: 1px; text-align: right; white-space: nowrap; }
+  .score.none { font-size: 15px; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+  .row.cancelled .t, .row.cancelled .day b { text-decoration: line-through; text-decoration-color: var(--red); }
+  .tag-red { color: var(--red); font-weight: 600; }
+
+  .empty { text-align: center; color: var(--muted); padding: 48px 12px; }
+  .empty b { display: block; color: var(--ink); font-family: var(--display); font-size: 22px; margin-bottom: 4px; }
+
+  /* ---------- statistici ---------- */
+  .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 18px; }
+  .stat { background: var(--paper); border-radius: 10px; padding: 14px; }
+  .stat b { display: block; font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1; }
+  .stat span { font-size: 14px; color: var(--muted); }
+  .bars { background: var(--paper); border-radius: 10px; padding: 14px; margin-top: 8px; }
+  .bars h3 { margin: 0 0 10px; font-family: var(--display); font-weight: 600; font-size: 19px; }
+  .bar { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin-bottom: 10px; font-size: 14.5px; }
+  .bar i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--rule); position: relative; overflow: hidden; }
+  .bar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--pitch-2); border-radius: 4px; }
+  @media (prefers-color-scheme: dark) { .bar i::after { background: var(--yellow); } }
+
+  /* ---------- barem ---------- */
+  .owed { margin-top: 18px; background: var(--paper); border-radius: 12px; padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
+  .owed b { display: block; font-family: var(--display); font-weight: 700; font-size: 38px; line-height: 1; }
+  .owed span { font-size: 14px; color: var(--muted); }
+  .owed .due b { color: var(--red); }
+  .owed .due.zero b { color: var(--ink); }
+  .owed .later { grid-column: 1 / -1; font-size: 14px; color: var(--muted); border-top: 1px solid var(--rule); padding-top: 10px; margin-top: 6px; }
+  .mblock { background: var(--paper); border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+  .mhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 14px 4px; }
+  .mhead h3 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 20px; }
+  .mhead .sum { font-family: var(--display); font-weight: 700; font-size: 24px; white-space: nowrap; }
+  .org { font-size: 14px; font-weight: 600; color: var(--muted); padding: 10px 14px 2px; display: flex; justify-content: space-between; gap: 10px; }
+  .fee-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; width: 100%; text-align: left;
+    background: transparent; border: 0; border-top: 1px solid var(--rule); padding: 10px 14px; cursor: pointer; font-size: 15px; }
+  .fee-row:first-of-type { border-top: 0; }
+  .fee-row .w { color: var(--muted); font-size: 13.5px; }
+  .fee-row .a { font-weight: 600; white-space: nowrap; text-align: right; }
+  .fee-row .a.missing { color: var(--red); }
+  .paybar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 14px; }
+  .paybar .st { font-size: 14px; color: var(--muted); }
+  .paybar .st.ok { color: var(--pitch-2); font-weight: 600; }
+  @media (prefers-color-scheme: dark) { .paybar .st.ok { color: var(--yellow); } }
+  .pay-btn { flex: none; border: 1.5px solid var(--pitch-2); background: transparent; color: var(--ink); border-radius: 999px;
+    height: 38px; padding: 0 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .pay-btn.on { background: var(--pitch-2); color: #f3f5f1; }
+  @media (prefers-color-scheme: dark) { .pay-btn { border-color: var(--yellow); } .pay-btn.on { background: var(--yellow); color: var(--yellow-ink); } }
+  .frf-pay { display: flex; align-items: center; gap: 10px; }
+  .frf-pay input { width: 24px; height: 24px; accent-color: var(--pitch-2); flex: none; }
+  .paid-mark { text-decoration: line-through; text-decoration-color: var(--muted); color: var(--muted); }
+
+  .fee-hint { font-size: 13.5px; color: var(--muted); margin-top: -6px; }
+  .fee-hint button { border: 0; background: transparent; padding: 0; color: var(--ink); text-decoration: underline; font-size: 13.5px; cursor: pointer; }
+  .seg { display: flex; gap: 6px; }
+  .seg label { flex: 1; display: block; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 9px 4px; border-radius: 8px; border: 1.5px solid var(--rule); color: var(--ink); font-weight: 600; cursor: pointer; }
+  .seg input:checked + span { border-color: var(--pitch-2); background: var(--pitch-2); color: #f3f5f1; }
+  .seg input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+  @media (prefers-color-scheme: dark) { .seg input:checked + span { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } }
+  .mblock > .w { font-size: 13.5px; color: var(--muted); }
+  .inv { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; width: 100%; text-align: left;
+    background: transparent; border: 0; border-top: 1px solid var(--rule); padding: 12px 14px; cursor: pointer; color: var(--ink); }
+  .inv-l { display: grid; gap: 2px; }
+  .inv-l b { font-weight: 600; font-size: 15.5px; }
+  .inv-l span { font-size: 13.5px; color: var(--muted); }
+  .inv-l .inv-st { font-weight: 600; margin-top: 2px; }
+  .inv-st.issued { color: #b07a00; }
+  .inv-st.ok { color: var(--pitch-2); }
+  @media (prefers-color-scheme: dark) { .inv-st.ok { color: var(--yellow); } .inv-st.issued { color: #f0b44a; } }
+  .inv-r { font-family: var(--display); font-weight: 700; font-size: 20px; white-space: nowrap; }
+  .inv-head { display: grid; gap: 14px; margin-top: 12px; }
+  .inv-head span { display: block; font-size: 13px; color: #b6cbc1; }
+  .inv-head b { font-family: var(--display); font-weight: 600; font-size: 22px; line-height: 1.15; }
+  .inv-total { background: var(--pitch-2); border-radius: 10px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .inv-total b { font-size: 28px; font-weight: 700; }
+  ol.lines { list-style: none; margin: 0; padding: 4px 14px; background: var(--paper); border-radius: 10px; counter-reset: ln; }
+  ol.lines li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--rule); counter-increment: ln; }
+  ol.lines li:last-child { border-bottom: 0; }
+  ol.lines li::before { content: counter(ln); color: var(--muted); font-size: 14px; padding-top: 1px; }
+  .ln-main { display: grid; gap: 2px; min-width: 0; }
+  .ln-main b { font-weight: 600; }
+  .ln-main span { font-size: 13.5px; color: var(--muted); }
+  .ln-main .ln-meta { font-size: 12.5px; }
+  .ln-val { font-weight: 600; white-space: nowrap; }
+  ol.lines li.missing .ln-val, .missing { color: var(--red); }
+  .to-field { display: grid; gap: 4px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .to-field input { padding: 8px 10px; font-size: 15px; }
+  .msec { background: var(--paper); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+  .msec-head { display: grid; grid-template-columns: 1fr auto 18px; gap: 10px; align-items: center; width: 100%; text-align: left;
+    border: 0; background: transparent; padding: 14px; cursor: pointer; color: var(--ink); }
+  .msec-t { font-family: var(--display); font-weight: 600; font-size: 20px; }
+  .msec-m { font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .chev { color: var(--muted); transition: transform .15s ease; }
+  .msec.open .chev { transform: rotate(90deg); }
+  .msec-body { padding: 0 8px 8px; }
+  .msec-st { grid-column: 1 / -1; font-size: 13.5px; font-weight: 600; color: var(--red); margin-top: -4px; }
+  .msec-st.ok { color: var(--pitch-2); }
+  @media (prefers-color-scheme: dark) { .msec-st.ok { color: var(--yellow); } }
+  .set-sec { margin-top: 18px; }
+  .set-t { font-size: 17px; }
+  .set-body { border-top: 1px solid var(--rule); }
+  .set-form { border-radius: 0; background: transparent; }
+  .msec-inv { margin: 0; border-radius: 0; border-top: 1px solid var(--rule); }
+  .msec-body .row { background: var(--chalk); }
+  @media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 16px 0 2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; border: 1.5px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 999px;
+    padding: 7px 12px; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .chips button span { color: var(--muted); font-weight: 500; margin-left: 2px; }
+  .chips button[aria-selected="true"] { background: var(--pitch-2); border-color: var(--pitch-2); color: #f3f5f1; }
+  .chips button[aria-selected="true"] span { color: #cfe0d8; }
+  @media (prefers-color-scheme: dark) { .chips button[aria-selected="true"] { background: var(--yellow); border-color: var(--yellow); color: var(--yellow-ink); } .chips button[aria-selected="true"] span { color: var(--yellow-ink); } }
+  .add-btn { display: block; width: 100%; margin-top: 16px; border: 1.5px dashed var(--muted); background: transparent; color: var(--ink);
+    border-radius: 10px; height: 46px; font-weight: 600; font-size: 15px; cursor: pointer; }
+  select { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 11px 12px; font-size: 16px; color: var(--ink); }
+  input[type=date], input[type=time] { width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px; padding: 10px 12px; font-size: 16px; color: var(--ink); min-height: 46px; }
+  .seg { flex-wrap: nowrap; }
+  .seg span { font-size: 14.5px; padding: 9px 2px; }
+  .note { font-size: 14px; color: var(--muted); background: var(--chalk); border-radius: 8px; padding: 10px 12px; }
+
+  /* ---------- foaia meciului (detalii) ---------- */
+  .sheet {
+    position: fixed; inset: 0; z-index: 20; background: var(--chalk); overflow-y: auto;
+    padding-bottom: calc(var(--safe-bot) + 32px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .sheet:not(.hidden) { animation: up .25s ease-out; }
+    @keyframes up { from { transform: translateY(24px); opacity: .4; } to { transform: none; opacity: 1; } }
+  }
+  .sheet-head { background: var(--pitch); color: #f3f5f1; padding: calc(var(--safe-top) + 12px) 16px 20px; }
+  .back { border: 0; background: transparent; color: #f3f5f1; font-weight: 600; font-size: 16px; padding: 8px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .board { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-top: 10px; text-align: center; }
+  .board .club { font-family: var(--display); font-weight: 600; font-size: 20px; line-height: 1.1; }
+  .board .big { font-family: var(--display); font-weight: 700; font-size: 46px; line-height: 1; letter-spacing: 2px; }
+  .board .half { font-size: 13px; color: #b6cbc1; }
+  .board .vs { font-family: var(--display); font-size: 22px; color: #b6cbc1; }
+  .cancel-note { margin-top: 14px; background: var(--red); color: #fff; border-radius: 8px; padding: 8px 12px; font-weight: 600; font-size: 14px; }
+
+  .sec { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+  .sec h2 { font-family: var(--display); font-weight: 600; font-size: 21px; margin: 24px 0 8px; }
+  dl.facts { margin: 0; background: var(--paper); border-radius: 10px; padding: 4px 14px; }
+  dl.facts div { display: grid; grid-template-columns: 112px 1fr; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  dl.facts div:last-child { border-bottom: 0; }
+  dt { color: var(--muted); font-size: 14.5px; }
+  dd { margin: 0; font-weight: 500; }
+  .crew { background: var(--paper); border-radius: 10px; padding: 4px 14px; list-style: none; margin: 0; }
+  .crew li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .crew li:last-child { border-bottom: 0; }
+  .crew .me { font-weight: 700; }
+  .crew .r { color: var(--muted); font-size: 14.5px; white-space: nowrap; }
+
+  form.mine { background: var(--paper); border-radius: 10px; padding: 14px; display: grid; gap: 14px; }
+  label { display: grid; gap: 6px; font-size: 14.5px; color: var(--muted); }
+  input[type=text], input[type=number], input[type=email], input[type=password], textarea {
+    width: 100%; border: 1.5px solid var(--rule); background: var(--chalk); border-radius: 8px;
+    padding: 11px 12px; font-size: 16px; color: var(--ink);
+  }
+  textarea { min-height: 84px; resize: vertical; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .check { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: 16px; }
+  .check input { width: 22px; height: 22px; accent-color: var(--pitch-2); }
+  .primary {
+    border: 0; border-radius: 10px; background: var(--pitch); color: #f3f5f1; height: 48px;
+    font-weight: 600; font-size: 16px; cursor: pointer; width: 100%;
+  }
+  @media (prefers-color-scheme: dark) { .primary { background: var(--yellow); color: var(--yellow-ink); } }
+  .primary:disabled { opacity: .6; }
+
+  /* ---------- login ---------- */
+  .login { min-height: 100vh; background: var(--pitch); color: #f3f5f1; padding: calc(var(--safe-top) + 48px) 20px 32px; }
+  .login-in { max-width: 420px; margin: 0 auto; }
+  .login h1 { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; margin: 0 0 8px; }
+  .login p { color: #b6cbc1; margin: 0 0 28px; }
+  .login label { color: #cfe0d8; }
+  .login input { background: var(--pitch-2); border-color: var(--line); color: #f3f5f1; }
+  .login .primary { background: var(--yellow); color: var(--yellow-ink); margin-top: 8px; }
+  .login form { display: grid; gap: 16px; }
+  .hint { font-size: 13px; color: #9fb7ac; margin-top: -8px; }
+  .err { color: #ffb4ab; font-weight: 600; min-height: 1.4em; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(var(--safe-bot) + 20px); transform: translateX(-50%);
+    background: var(--ink); color: var(--chalk); padding: 11px 16px; border-radius: 10px; font-weight: 500;
+    font-size: 15px; z-index: 40; max-width: calc(100% - 32px); box-shadow: 0 8px 20px rgba(0,0,0,.25);
+  }
+  .logout { display: block; margin: 28px auto 0; border: 0; background: transparent; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="login" class="login hidden">
+  <div class="login-in">
+    <h1>Meciurile mele</h1>
+    <p>Intră o singură dată. Datele rămân salvate pe telefon.</p>
+    <form id="loginForm" autocomplete="on">
+      <label>Email
+        <input type="email" id="lEmail" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </label>
+      <label>Parolă
+        <input type="password" id="lPass" autocomplete="current-password" required>
+      </label>
+      <label>Cheia de sincronizare
+        <input type="password" id="lKey" autocomplete="off" autocapitalize="none" autocorrect="off" required>
+      </label>
+      <div class="hint">Valoarea APP_KEY din setările scriptului Google.</div>
+      <div class="err" id="lErr" role="alert"></div>
+      <button class="primary" type="submit" id="lBtn">Intră</button>
+    </form>
+  </div>
+</section>
+
+<!-- ===================== APLICAȚIA ===================== -->
+<div id="app" class="hidden">
+  <header class="top">
+    <div class="top-row">
+      <div>
+        <h1>Meciurile mele</h1>
+        <div class="sync-state" id="syncState">Se încarcă…</div>
+      </div>
+      <button class="sync-btn" id="syncBtn" type="button" aria-label="Verifică delegări noi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
+        Verifică
+      </button>
+    </div>
+    <div class="next-wrap" id="next"></div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="upcoming" aria-selected="true">Urmează</button>
+    <button role="tab" data-tab="played" aria-selected="false">Arbitrate</button>
+    <button role="tab" data-tab="barem" aria-selected="false">Barem</button>
+    <button role="tab" data-tab="stats" aria-selected="false">Statistici</button>
+  </nav>
+
+  <main id="view"></main>
+</div>
+
+<!-- ===================== DETALII MECI ===================== -->
+<section id="sheet" class="sheet hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"></section>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+/* ---------- configurare (nimic secret aici) ---------- */
+const CONFIG = {
+  SUPABASE_URL: 'https://ivnwfsdjyqzgqjddqdfe.supabase.co',
+  SUPABASE_KEY: 'sb_publishable_xdA-6uO0LkBoRvbmZc7bUg_2NwY1D4D',
+  SYNC_URL: 'https://script.google.com/macros/s/AKfycbxHHsHWwMVjG73HI2ZhIJPiZkVvYQW0yxz0HAKq_0biUyCmzKeLgx8-R2CkbGvOYzs/exec',
+};
+
+const sb = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
+
+const $ = (s) => document.querySelector(s);
+const store = {
+  get(k, d = null) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
+};
+
+let matches = store.get('meciuri_cache', []);
+let tab = 'upcoming';
+let lastSync = store.get('meciuri_last_sync', null);
+
+/* ---------- utilitare ---------- */
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function parseLocal(s) {            // "2026-10-25T15:00:00" = ora României, fără fus orar
+  if (!s) return null;
+  const [d, t = '00:00'] = s.split('T');
+  const [y, m, day] = d.split('-').map(Number);
+  const [h, mi] = t.split(':').map(Number);
+  return new Date(y, m - 1, day, h, mi);
+}
+const fmt = {
+  time: (d) => d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' }),
+  dayMon: (d) => d.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' }).replace('.', ''),
+  full: (d) => d.toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+  month: (d) => { const s = d.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' }); return s[0].toUpperCase() + s.slice(1); },
+  weekday: (d) => d.toLocaleDateString('ro-RO', { weekday: 'long' }),
+  money: (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' lei',
+  km: (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 1 }) + ' km',
+};
+function relDay(d) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const that = new Date(d); that.setHours(0, 0, 0, 0);
+  const diff = Math.round((that - today) / 86400000);
+  if (diff === 0) return 'Azi';
+  if (diff === 1) return 'Mâine';
+  if (diff > 1 && diff < 7) { const w = fmt.weekday(d); return w[0].toUpperCase() + w.slice(1); }
+  return fmt.dayMon(d);
+}
+function ago(iso) {
+  if (!iso) return 'Nesincronizat încă';
+  const min = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (min < 1) return 'Actualizat acum';
+  if (min < 60) return `Actualizat acum ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `Actualizat acum ${h} h`;
+  return 'Actualizat ' + new Date(iso).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+}
+function myOfficial(m) { return (m.match_officials || []).find((o) => o.is_me); }
+function roleLabel(m) {
+  const me = myOfficial(m);
+  if (me) return officialRole(me);
+  const r = String(m.my_role || '').toLowerCase();
+  if (r.includes('observ')) return 'Observator';
+  if (r.includes('patrulea')) return 'Al 4-lea oficial';
+  if (r.includes('asistent')) return 'Asistent';
+  if (r === 'arbitru' || r.includes('central')) return 'Central';
+  return m.my_role || 'Delegat';
+}
+function officialRole(o) {
+  if (o.observer_role_id) return 'Observator';
+  if (o.role_id === 1) return 'Central';
+  if (o.role_id === 2) return o.position === 1 ? 'Asistent 2' : 'Asistent 1';
+  if (o.role_id) return 'Rezervă';
+  return 'Oficial';
+}
+const roleOrder = (o) => o.observer_role_id ? 9 : o.role_id === 1 ? 0 : o.role_id === 2 ? 1 + (o.position || 0) : 5;
+const hasScore = (m) => m.home_goals !== null && m.home_goals !== undefined && m.away_goals !== null && m.away_goals !== undefined;
+const isUpcoming = (m) => { const d = parseLocal(m.start_local); return d && d.getTime() > Date.now() - 2 * 3600 * 1000; };
+
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3200);
+}
+
+/* ---------- date ---------- */
+async function loadFromDb() {
+  const { data, error } = await sb
+    .from('matches')
+    .select('*, match_officials(*)')
+    .order('start_local', { ascending: false });
+  if (error) throw error;
+  matches = data || [];
+  store.set('meciuri_cache', matches);
+  loadSettings().then(() => { if (tab === 'barem') render(); }).catch(() => {});
+}
+
+async function syncFromFc() {
+  const key = store.get('meciuri_app_key');
+  if (!key) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const res = await fetch(CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key), { signal: ctrl.signal });
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'Sincronizarea a eșuat');
+    lastSync = new Date().toISOString();
+    store.set('meciuri_last_sync', lastSync);
+    return j;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let syncing = false;
+async function refresh({ fromFc = true } = {}) {
+  if (syncing) return;
+  syncing = true;
+  const btn = $('#syncBtn');
+  btn.classList.add('busy');
+  $('#syncState').textContent = fromFc ? 'Verific Football Connect…' : 'Se încarcă…';
+  try {
+    if (fromFc) {
+      const r = await syncFromFc();
+      await loadFromDb();
+      if (r) {
+        if (r.inserted > 0) toast(r.inserted === 1 ? 'O delegare nouă' : `${r.inserted} delegări noi`);
+        else if (r.cancelled > 0) toast(r.cancelled === 1 ? 'O delegare a fost anulată' : `${r.cancelled} delegări anulate`);
+        else if (r.skipped) toast('Sincronizarea rula deja, am încărcat ultimele date');
+        if (r.errors && r.errors.length) setTimeout(() => toast(r.errors.join(' · ')), 3400);
+      }
+    } else {
+      await loadFromDb();
+    }
+  } catch (e) {
+    const offline = !navigator.onLine;
+    toast(offline ? 'Fără internet. Vezi ultima listă salvată.' : (e.name === 'AbortError' ? 'Football Connect nu a răspuns. Încearcă din nou.' : e.message));
+    try { if (fromFc && navigator.onLine) await loadFromDb(); } catch {}
+  } finally {
+    syncing = false;
+    btn.classList.remove('busy');
+    render();
+  }
+}
+
+/* ---------- randare ---------- */
+function render() {
+  $('#syncState').textContent = ago(lastSync);
+  renderNext();
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  if (tab === 'stats') renderStats();
+  else if (tab === 'barem') renderBarem();
+  else renderList();
+}
+
+/* ---------- barem ---------- */
+const pad = (n) => String(n).padStart(2, '0');
+const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+const monthKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+const lei = (n) => Number(n || 0).toLocaleString('ro-RO', { maximumFractionDigits: 2 }) + ' lei';
+const leiR = (n) => Math.round(Number(n || 0)).toLocaleString('ro-RO') + ' lei';
+const money2 = (n) => Number(n || 0).toFixed(2);
+const isFrf = (m) => m.organizer === 'FRF';
+const billingOf = (m) => m.billing || (isFrf(m) ? 'frf' : 'ajf');
+const BILLING = { ajf: 'AJF Alba', ajf_club: 'FRF prin AJF', frf: 'FRF direct' };
+const counts = (m) => m.status === 'activ';
+const totalOf = (m) => Number(m.fee_amount || 0) + Number(m.transport_amount || 0);
+const sumOf = (list) => list.reduce((s, m) => s + totalOf(m), 0);
+let settings = store.get('meciuri_settings', { consum_l_100km: 7.5, pret_carburant: null, localitate_plecare: 'Ocna Mures' });
+let groups = new Map();
+
+async function loadSettings() {
+  const { data } = await sb.from('settings').select('*');
+  if (data) { for (const r of data) settings[r.key] = r.value ?? r.text_value ?? null; store.set('meciuri_settings', settings); }
+}
+
+/* rândurile facturii, în formatul din SmartBill */
+const ageSuffix = (m) => (m.age_group && !/senior/i.test(m.age_group) ? ' ' + m.age_group : '');
+const destOf = (m) => m.transport_to || m.venue_city || '';
+const routeOf = (m) => m.transport_to || !m.transport_route
+  ? `${settings.localitate_plecare || 'Ocna Mures'} - ${destOf(m) || '…'}`
+  : m.transport_route;
+function invoiceLines(list) {
+  const lines = [];
+  for (const m of [...list].sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local))) {
+    lines.push({ m, name: 'Barem arbitraj', desc: `Servicii de arbitraj sportiv la meciul ${m.home_club} - ${m.away_club}${ageSuffix(m)}`, um: 'Meci', qty: 1, price: m.fee_amount });
+  }
+  for (const m of list) {
+    // un rând pe drum: la meciul care primește transportul (nu la cele „incluse")
+    if (billingOf(m) !== 'ajf' && !m.transport_with && !(m.transport_amount != null && Number(m.transport_amount) === 0)) {
+      lines.push({ m, name: 'Transport', desc: `Transport: ${routeOf(m)}`, um: 'Buc', qty: 1,
+        price: m.transport_amount == null ? null : Number(m.transport_amount), transport: true });
+    }
+  }
+  return lines;
+}
+const clientOf = (key, list) => {
+  const [, type, who] = key.split('|');
+  if (type === 'ajf') return 'Asociația Județeană de Fotbal Alba';
+  if (type === 'club') return `AJF Alba (meciurile ${who})`;
+  return list[0].fee_payer || list[0].home_club;
+};
+function invoiceState(list) {
+  const no = list.find((m) => m.invoice_no)?.invoice_no;
+  if (list.every((m) => m.fee_paid)) return { cls: 'ok', text: 'Încasată' + (no ? ' · ' + no : '') };
+  if (no) return { cls: 'issued', text: 'Emisă ' + no + ', neîncasată' };
+  return { cls: '', text: 'Neemisă' };
+}
+
+function renderBarem() {
+  const played = matches.filter((m) => counts(m) && !isUpcoming(m));
+  const later = matches.filter((m) => counts(m) && isUpcoming(m));
+  if (!played.length && !later.length) {
+    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>' + settingsBox();
+    return;
+  }
+  const due = sumOf(played.filter((m) => !m.fee_paid));
+  const paid = sumOf(played.filter((m) => m.fee_paid));
+  const laterSum = sumOf(later);
+  const missing = played.filter((m) => m.fee_amount === null || m.fee_amount === undefined).length;
+  const noFuel = played.some((m) => billingOf(m) !== 'ajf' && !m.transport_with && m.transport_amount == null);
+
+  // luni → facturi: AJF (una pe lună), FRF prin AJF (una pe club și lună), FRF direct (una pe club și zi)
+  const months = new Map();
+  groups = new Map();
+  for (const m of played.sort((a, b) => parseLocal(b.start_local) - parseLocal(a.start_local))) {
+    const d = parseLocal(m.start_local), k = monthKey(d), b = billingOf(m);
+    if (!months.has(k)) months.set(k, { label: fmt.month(d), keys: [] });
+    const key = b === 'ajf' ? `${k}|ajf`
+      : b === 'ajf_club' ? `${k}|club|${m.fee_payer || m.home_club}`
+      : `${k}|frf|${m.fee_payer || m.home_club}|${m.start_local.slice(0, 10)}`;
+    if (!groups.has(key)) { groups.set(key, []); months.get(k).keys.push(key); }
+    groups.get(key).push(m);
+  }
+  const order = (key) => key.includes('|ajf') ? 0 : key.includes('|club|') ? 1 : 2;
+
+  let html = `
+    <div class="owed">
+      <div class="due${due ? '' : ' zero'}"><b>${leiR(due)}</b><span>de încasat</span></div>
+      <div><b>${leiR(paid)}</b><span>încasat</span></div>
+      ${laterSum ? `<div class="later">Încă ${leiR(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
+      ${missing ? `<div class="later">${missing === 1 ? 'Un meci nu are' : missing + ' meciuri nu au'} tarif. Deschide-l și completează suma.</div>` : ''}
+      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului în Setări, jos.</div>' : ''}
+    </div>`;
+
+  let openB = store.get('meciuri_open_barem', null);
+  if (!Array.isArray(openB)) openB = months.size ? [months.keys().next().value] : [];   // implicit: luna cea mai recentă
+  for (const [mk, g] of months) {
+    const keys = g.keys.sort((a, b) => order(a) - order(b));
+    const all = keys.flatMap((k) => groups.get(k));
+    const isOpen = openB.includes(mk);
+    const unpaid = keys.filter((k) => !groups.get(k).every((m) => m.fee_paid)).length;
+    html += `<section class="msec${isOpen ? ' open' : ''}">
+      <button class="msec-head" type="button" data-bmonth="${mk}" aria-expanded="${isOpen}">
+        <span class="msec-t">${esc(g.label)}</span>
+        <span class="msec-m">${keys.length} ${keys.length === 1 ? 'factură' : 'facturi'} · ${leiR(sumOf(all))}</span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        <span class="msec-st ${unpaid ? '' : 'ok'}">${unpaid ? (unpaid === 1 ? '1 factură neîncasată' : unpaid + ' facturi neîncasate') : 'Toate încasate'}</span>
+      </button>`;
+    if (!isOpen) { html += '</section>'; continue; }
+    html += `<div class="mblock msec-inv">`;
+    for (const key of keys) {
+      const list = groups.get(key);
+      const st = invoiceState(list);
+      const type = key.split('|')[1];
+      const title = type === 'ajf' ? 'AJF Alba, toată luna'
+        : type === 'club' ? `AJF pentru ${key.split('|')[2]}`
+        : `${list[0].fee_payer || list[0].home_club}, ${parseLocal(list[0].start_local).getDate()} ${fmt.month(parseLocal(list[0].start_local)).split(' ')[0].toLowerCase()}`;
+      const sub = list.length === 1
+        ? `${list[0].home_club} – ${list[0].away_club}${ageSuffix(list[0])}`
+        : `${list.length} meciuri` + (list.some((m) => Number(m.transport_amount) > 0) ? ' + transport' : '');
+      html += `
+        <button class="inv" type="button" data-invoice="${esc(key)}">
+          <span class="inv-l"><b>${esc(title)}</b><span>${esc(sub)}</span><span class="inv-st ${st.cls}">${esc(st.text)}</span></span>
+          <span class="inv-r">${lei(sumOf(list))}</span>
+        </button>`;
+    }
+    html += '</div></section>';
+  }
+  const prevY = window.scrollY;
+  $('#view').innerHTML = html + settingsBox();
+  window.scrollTo(0, prevY);
+}
+
+/* ---------- foaia unei facturi ---------- */
+function openInvoice(key, { push = true } = {}) {
+  const list = groups.get(key);
+  if (!list) return;
+  const lines = invoiceLines(list);
+  const total = lines.reduce((s, l) => s + Number(l.price || 0), 0);
+  const st = invoiceState(list);
+  const no = list.find((m) => m.invoice_no)?.invoice_no || '';
+  const date = list.find((m) => m.invoice_date)?.invoice_date || '';
+  const allPaid = list.every((m) => m.fee_paid);
+  const sh = $('#sheet');
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="inv-head">
+        <div><span>Client</span><b id="sheetTitle">${esc(clientOf(key, list))}</b></div>
+        <div class="inv-total"><span>Total plată</span><b>${money2(total).replace('.', ',')} lei</b></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Produse și servicii</h2>
+      <ol class="lines">
+        ${lines.map((l) => `
+          <li${l.price == null ? ' class="missing"' : ''}>
+            <div class="ln-main"><b>${esc(l.name)}</b><span>${esc(l.desc)}</span>
+              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? (l.transport ? 'completează km în foaia meciului' : 'fără tarif') : money2(l.price) + ' lei'}${l.transport ? (l.m.transport_manual_amount != null ? ' · sumă pusă de tine' : l.m.transport_km != null ? ` · ${String(l.m.transport_km).replace('.', ',')} km` : '') : ''}</span>
+              ${l.transport ? `<label class="to-field">Merg până la
+                <input type="text" data-to="${l.m.match_id}" value="${esc(l.m.transport_to || '')}" placeholder="${esc(l.m.venue_city || 'ex. Blaj')}" enterkeyhint="done">
+              </label>` : ''}</div>
+            <div class="ln-val">${l.price == null ? '–' : money2(l.price)}</div>
+          </li>`).join('')}
+      </ol>
+      <button class="add-btn" type="button" id="copyLines">Copiază rândurile pentru SmartBill</button>
+      <p class="fee-hint" style="margin-top:8px">Km și prețul carburantului se schimbă din foaia meciului.</p>
+
+      <h2>Evidență</h2>
+      <form class="mine" id="invForm">
+        <div class="two">
+          <label>Număr factură <input type="text" id="iNo" value="${esc(no)}" placeholder="ex. TB0005" autocapitalize="characters"></label>
+          <label>Data emiterii <input type="date" id="iDate" value="${esc(date || '')}"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="iPaid" ${allPaid ? 'checked' : ''}> Încasată</label>
+        <div class="fee-hint">Stare: ${esc(st.text)}.</div>
+        <button class="primary" type="submit" id="iSave">Salvează</button>
+      </form>
+
+      <h2>Meciurile de pe factură</h2>
+      <div class="mblock">
+        ${[...list].sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local)).map((m) => `
+          <div class="fee-row"><div data-id="${m.match_id}" role="button" tabindex="0">
+            <div>${parseLocal(m.start_local).getDate()} ${esc(parseLocal(m.start_local).toLocaleDateString('ro-RO', { month: 'short' }).replace('.', ''))}: ${esc(m.home_club)} – ${esc(m.away_club)}</div>
+            <div class="w">${esc(m.competition)}, ${esc(roleLabel(m))}</div>
+          </div><span class="a">${m.fee_amount == null ? '<span class="missing">fără tarif</span>' : leiR(totalOf(m))}</span></div>`).join('')}
+      </div>
+    </div>`;
+  sh.classList.remove('hidden');
+  if (push) {
+    sh.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    history.pushState({ sheet: 'inv' }, '');
+  }
+  $('#back').onclick = () => history.back();
+
+  sh.querySelectorAll('input[data-to]').forEach((inp) => inp.onchange = async () => {
+    const id = inp.dataset.to, val = inp.value.trim() || null;
+    const { error } = await sb.from('matches').update({ transport_to: val }).eq('match_id', id);
+    if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+    Object.assign(matches.find((m) => m.match_id === id) || {}, { transport_to: val });
+    store.set('meciuri_cache', matches);
+    toast('Traseu salvat');
+    const top = sh.scrollTop; openInvoice(key, { push: false }); sh.scrollTop = top;
+  });
+
+  $('#copyLines').onclick = async () => {
+    const text = lines.map((l, i) => [i + 1, l.name, l.desc, l.um, l.qty, l.price == null ? '' : money2(l.price), l.price == null ? '' : money2(l.price * l.qty)].join('\t')).join('\n')
+      + `\n\tTOTAL PLATĂ\t\t\t\t\t${money2(total)}`;
+    try { await navigator.clipboard.writeText(text); toast('Rânduri copiate'); }
+    catch { toast('Nu am putut copia. Selectează textul manual.'); }
+  };
+
+  $('#invForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = $('#iSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
+    const patch = { invoice_no: $('#iNo').value.trim().toUpperCase() || null, invoice_date: $('#iDate').value || null };
+    if ($('#iPaid').checked !== allPaid) patch.fee_paid = $('#iPaid').checked;
+    if (patch.invoice_no && !patch.invoice_date) patch.invoice_date = localIso(new Date()).slice(0, 10);
+    const ids = list.map((m) => m.match_id);
+    const { data, error } = await sb.from('matches').update(patch).in('match_id', ids).select('match_id, invoice_no, invoice_date, fee_paid, fee_paid_at');
+    btn.disabled = false; btn.textContent = 'Salvează';
+    if (error) { toast('Nu s-a salvat: ' + error.message); return; }
+    for (const r of data && data.length ? data : ids.map((id) => ({ match_id: id, ...patch }))) Object.assign(matches.find((m) => m.match_id === r.match_id) || {}, r);
+    store.set('meciuri_cache', matches);
+    toast('Factură salvată');
+    render();
+    const top = sh.scrollTop; openInvoice(key, { push: false }); sh.scrollTop = top;
+  };
+}
+
+function settingsBox() {
+  const open = store.get('meciuri_open_settings', false) === true;
+  const sum = `Consum ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l · carburant ${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' lei/l' : 'nesetat'}`;
+  return `
+    <section class="msec set-sec${open ? ' open' : ''}">
+      <button class="msec-head" type="button" data-settings aria-expanded="${open}">
+        <span class="msec-t set-t">Setări</span>
+        <span class="msec-m">${esc(sum)}</span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      ${open ? `<div class="set-body">
+    <form class="mine set-form" id="setForm">
+      <div class="two">
+        <label>Consum (l / 100 km)
+          <input type="number" id="sCons" step="0.1" min="0" inputmode="decimal" value="${settings.consum_l_100km ?? ''}">
+        </label>
+        <label>Preț carburant (lei / l)
+          <input type="number" id="sPrice" step="0.01" min="0" inputmode="decimal" value="${settings.pret_carburant ?? ''}" placeholder="ex. 7,80">
+        </label>
+      </div>
+      <label>Plec din
+        <input type="text" id="sFrom" value="${esc(settings.localitate_plecare || '')}" placeholder="ex. Ocna Mures">
+      </label>
+      <div class="fee-hint">Transport = (km dus-întors / 100) × consum × preț. Km reali și prețul de pe bon le pui în foaia meciului.</div>
+      <label>Barem la cupe (AJF)
+        <select id="sCup">
+          <option value="0" ${Number(settings.cupa_dupa_gazda) === 1 ? '' : 'selected'}>După liga echipei mai bine clasate</option>
+          <option value="1" ${Number(settings.cupa_dupa_gazda) === 1 ? 'selected' : ''}>După liga gazdei</option>
+        </select>
+      </label>
+      <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
+    </form>
+      </div>` : ''}
+    </section>`;
+}
+
+async function saveSettings(ev) {
+  ev.preventDefault();
+  const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
+  const btn = $('#sSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
+  const rows = [['consum_l_100km', { value: num($('#sCons').value) }], ['pret_carburant', { value: num($('#sPrice').value) }],
+                ['localitate_plecare', { text_value: $('#sFrom').value.trim() || null }],
+                ['cupa_dupa_gazda', { value: Number($('#sCup').value) }]];
+  let err = null;
+  for (const [key, patch] of rows) {
+    const { error } = await sb.from('settings').update(patch).eq('key', key);
+    if (error) err = error; else settings[key] = Object.values(patch)[0];
+  }
+  store.set('meciuri_settings', settings);
+  if (err) { toast('Nu s-a salvat: ' + err.message); btn.disabled = false; btn.textContent = 'Salvează și recalculează'; return; }
+  await loadFromDb();
+  toast('Transport recalculat');
+  render();
+}
+
+async function setMatchPaid(id, paid) {
+  const { data, error } = await sb.from('matches').update({ fee_paid: paid }).eq('match_id', id).select('match_id, fee_paid, fee_paid_at');
+  if (error) { toast('Nu s-a salvat: ' + error.message); render(); return; }
+  Object.assign(matches.find((m) => m.match_id === id) || {}, data?.[0] || { fee_paid: paid });
+  store.set('meciuri_cache', matches);
+  toast(paid ? 'Încasat' : 'Marcat neîncasat');
+  render();
+}
+
+/* ---------- adaugă meci (ex. juniori delegați pe ajfalba.ro) ---------- */
+const COMPETITIONS = ['Liga 4', 'Liga 5', 'SuperLiga AJF Alba', 'Campionatul Național U19', 'Campionatul Național U17',
+  'Campionatul Național U16', 'Campionatul Național U15', 'Campionatul Național U14', 'Campionatul Național U13',
+  'Juniori U19 Interjudețean', 'Juniori U17 Interjudețean', 'Juniori U16 Interjudețean', 'Juniori U16 Clasic',
+  'Juniori U15 Interjudețean', 'Juniori U15 Clasic', 'Juniori U14 Clasic', 'Juniori U13 Interjudețean', 'Juniori U13 Clasic',
+  'Juniori U12 Elite', 'Juniori U12 Clasic', 'Juniori U11 Elite', 'Juniori U11 Clasic', 'Juniori U10', 'Juniori U9',
+  'Liga de Tineret', 'Cupa Satelor', 'Interligă', 'Feminin'];
+
+function openAdd() {
+  const sh = $('#sheet');
+  const now = new Date();
+  const clubs = [...new Set(matches.flatMap((m) => [m.home_club, m.away_club]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ro'));
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">Adaugă un meci</div></div>
+    </div>
+    <div class="sec">
+      <p class="fee-hint" style="margin:18px 0 0">Pentru meciurile care nu apar nici în Football Connect, nici pe ajfalba.ro (turnee, amicale).</p>
+      <form class="mine" id="addForm" style="margin-top:14px">
+        <div class="two">
+          <label>Data <input type="date" id="aDate" required value="${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}"></label>
+          <label>Ora <input type="time" id="aTime" required value="11:00"></label>
+        </div>
+        <label>Competiția
+          <input type="text" id="aComp" list="compList" required placeholder="ex. Campionatul Național U16">
+          <datalist id="compList">${COMPETITIONS.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+        </label>
+        <label>Gazdă <input type="text" id="aHome" list="clubList" required></label>
+        <label>Oaspete <input type="text" id="aAway" list="clubList" required></label>
+        <datalist id="clubList">${clubs.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+        <div class="two">
+          <label>Rolul meu
+            <select id="aRole">
+              <option value="Arbitru">Central</option>
+              <option value="Arbitru asistent">Asistent</option>
+              <option value="Al patrulea oficial">Al 4-lea oficial</option>
+              <option value="Observator">Observator</option>
+            </select>
+          </label>
+          <label>Distanța (km, dus) <input type="number" id="aKm" step="0.1" min="0" inputmode="decimal"></label>
+        </div>
+        <label>Stadion <input type="text" id="aStadium"></label>
+        <div class="fee-hint">Barem-ul și tipul facturii se completează singure după competiție și clubul gazdă.</div>
+        <button class="primary" type="submit" id="aSave">Adaugă meciul</button>
+      </form>
+    </div>`;
+  sh.classList.remove('hidden');
+  sh.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  history.pushState({ sheet: 'add' }, '');
+  $('#back').onclick = () => history.back();
+  $('#addForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const btn = $('#aSave'); btn.disabled = true; btn.textContent = 'Se adaugă…';
+    const comp = $('#aComp').value.trim();
+    const age = (comp.match(/U\s?\d{1,2}/i) || [''])[0].toUpperCase().replace(/\s/g, '') || (/tineret/i.test(comp) ? 'Tineret' : 'Seniori');
+    const d = $('#aDate').value; // AAAA-LL-ZZ
+    const y = Number(d.slice(0, 4)), mo = Number(d.slice(5, 7));
+    const season = mo >= 7 ? `${String(y).slice(2)}-${String(y + 1).slice(2)}` : `${String(y - 1).slice(2)}-${String(y).slice(2)}`;
+    const km = $('#aKm').value === '' ? null : Number($('#aKm').value.replace(',', '.'));
+    const row = {
+      source: 'manual', competition: comp, age_group: age, season,
+      home_club: $('#aHome').value.trim(), away_club: $('#aAway').value.trim(),
+      stadium: $('#aStadium').value.trim() || null,
+      start_local: `${d}T${$('#aTime').value}:00`, my_role: $('#aRole').value, distance_km: km,
+    };
+    const { data, error } = await sb.from('matches').insert(row).select('*');
+    btn.disabled = false; btn.textContent = 'Adaugă meciul';
+    if (error) { toast('Nu s-a adăugat: ' + error.message); return; }
+    const m = { ...data[0], match_officials: [] };
+    matches.push(m); store.set('meciuri_cache', matches);
+    toast('Meci adăugat');
+    render();
+    openMatch(m.match_id, { push: false });
+  };
+}
+
+function renderNext() {
+  const up = matches.filter((m) => m.status === 'activ' && isUpcoming(m))
+    .sort((a, b) => parseLocal(a.start_local) - parseLocal(b.start_local));
+  const el = $('#next');
+  if (!up.length) { el.innerHTML = '<div class="no-next">Nicio delegare viitoare. Când primești una, apare aici.</div>'; return; }
+  const m = up[0], d = parseLocal(m.start_local);
+  const first = !renderNext._shown; renderNext._shown = true;
+  el.innerHTML = `
+    <button class="card${first ? ' raise' : ''}" data-id="${m.match_id}" type="button">
+      <div class="when">${esc(relDay(d))}<small>${fmt.time(d)}</small></div>
+      <div class="teams">${esc(m.home_club)} – ${esc(m.away_club)}</div>
+      <div class="meta">${esc(m.competition)}${m.series ? ', ' + esc(m.series) : ''}${m.round_no ? ', etapa ' + m.round_no : ''}<br>${esc(cleanStadium(m.stadium))}${m.distance_km ? ', ' + fmt.km(m.distance_km) : ''}</div>
+      <span class="role">${esc(roleLabel(m))}</span>
+    </button>`;
+}
+const cleanStadium = (s) => String(s || '').replace(/\s*\(.*\)\s*$/, '');
+
+const CATEGORIES = ['SuperLiga AJF', 'Liga 4', 'Liga 5', 'Juniori AJF', 'FRF', 'Cupe', 'Altele'];
+let playedCat = store.get('meciuri_cat', 'Toate');
+function categoryOf(m) {
+  const c = String(m.competition || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/^cupa/.test(c)) return 'Cupe';
+  if (m.organizer === 'FRF') return 'FRF';
+  if (/superliga/.test(c)) return 'SuperLiga AJF';
+  if (/^liga (4|iv)\b/.test(c)) return 'Liga 4';
+  if (/^liga (5|v)\b/.test(c)) return 'Liga 5';
+  if (/junior|junioar|\bu ?\d{1,2}\b|feminin|interliga/.test(c)) return 'Juniori AJF';
+  return 'Altele';
+}
+
+function renderList() {
+  const view = $('#view');
+  // păstrez poziția rândului de categorii și a paginii la redesenare
+  const prevChipsX = $('.chips') ? $('.chips').scrollLeft : null;
+  const prevY = window.scrollY;
+  let list = matches.filter((m) => tab === 'upcoming' ? isUpcoming(m) : !isUpcoming(m));
+  list.sort((a, b) => (tab === 'upcoming' ? 1 : -1) * (parseLocal(a.start_local) - parseLocal(b.start_local)));
+  const addBtn = '<button class="add-btn" id="addMatch" type="button">Adaugă un meci de mână</button>';
+
+  // categorii, doar la „Arbitrate"
+  let chips = '', chipsSig = '';
+  if (tab === 'played' && list.length) {
+    const cnt = {};
+    for (const m of list) { const c = categoryOf(m); cnt[c] = (cnt[c] || 0) + 1; }
+    const cats = CATEGORIES.filter((c) => cnt[c]);
+    if (!cats.includes(playedCat)) playedCat = 'Toate';
+    chipsSig = ['Toate:' + list.length, ...cats.map((c) => c + ':' + cnt[c])].join('|');
+    chips = `<div class="chips" role="tablist" aria-label="Categorii" data-sig="${esc(chipsSig)}">
+      ${['Toate', ...cats].map((c) => `<button type="button" role="tab" data-cat="${esc(c)}" aria-selected="${c === playedCat}">${esc(c)} <span>${c === 'Toate' ? list.length : cnt[c]}</span></button>`).join('')}
+    </div>`;
+    if (playedCat !== 'Toate') list = list.filter((m) => categoryOf(m) === playedCat);
+  }
+
+  if (!list.length) {
+    view.innerHTML = (tab === 'upcoming'
+      ? '<div class="empty"><b>Nimic programat</b>Apasă Verifică după ce primești mailul de delegare.</div>'
+      : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
+    return;
+  }
+  const rowHtml = (m) => {
+    const d = parseLocal(m.start_local);
+    const cancelled = m.status === 'anulat';
+    const score = hasScore(m)
+      ? `<div class="score">${m.home_goals}–${m.away_goals}</div>`
+      : `<div class="score none">${cancelled ? '<span class="tag-red">Anulat</span>' : fmt.time(d)}</div>`;
+    return `
+      <button class="row${cancelled ? ' cancelled' : ''}" data-id="${m.match_id}" type="button">
+        <div class="day"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('ro-RO', { weekday: 'short' }).replace('.', ''))}</span></div>
+        <div>
+          <div class="t">${esc(m.home_club)} <i>–</i> ${esc(m.away_club)}</div>
+          <div class="s">${esc(m.competition)}, ${esc(roleLabel(m))}${m.fee_amount !== null && m.fee_amount !== undefined && !cancelled ? ', ' + lei(m.fee_amount) : ''}</div>
+        </div>
+        ${score}
+      </button>`;
+  };
+
+  let html = addBtn;
+  if (tab === 'played') {
+    // luni care se deschid / închid
+    const groups = [];
+    for (const m of list) {
+      const d = parseLocal(m.start_local), k = monthKey(d);
+      if (!groups.length || groups[groups.length - 1].k !== k) groups.push({ k, label: fmt.month(d), list: [] });
+      groups[groups.length - 1].list.push(m);
+    }
+    let open = store.get('meciuri_open_months', null);
+    if (!Array.isArray(open)) open = [groups[0].k];          // implicit: luna cea mai recentă
+    for (const g of groups) {
+      const isOpen = open.includes(g.k);
+      const active = g.list.filter((m) => m.status === 'activ');
+      const sum = active.reduce((s2, m) => s2 + Number(m.fee_amount || 0), 0);
+      html += `
+        <section class="msec${isOpen ? ' open' : ''}">
+          <button class="msec-head" type="button" data-month="${g.k}" aria-expanded="${isOpen}">
+            <span class="msec-t">${esc(g.label)}</span>
+            <span class="msec-m">${active.length} ${active.length === 1 ? 'meci' : 'meciuri'}${sum ? ' · ' + leiR(sum) : ''}</span>
+            <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          ${isOpen ? `<div class="msec-body">${g.list.map(rowHtml).join('')}</div>` : ''}
+        </section>`;
+    }
+  } else {
+    let month = '';
+    for (const m of list) {
+      const mo = fmt.month(parseLocal(m.start_local));
+      if (mo !== month) { month = mo; html += `<h2 class="month">${esc(mo)}</h2>`; }
+      html += rowHtml(m);
+    }
+  }
+  // rândul de categorii NU se redesenează dacă e același: Safari pe iPhone i-ar reseta derularea
+  const existing = view.querySelector('.chips');
+  if (tab === 'played' && existing && existing.dataset.sig === chipsSig && view.querySelector('#listBody')) {
+    existing.querySelectorAll('[data-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.cat === playedCat)));
+    view.querySelector('#listBody').innerHTML = html;
+  } else {
+    view.innerHTML = chips + `<div id="listBody">${html}</div>`;
+    const chipsEl = view.querySelector('.chips');
+    if (chipsEl) {
+      if (prevChipsX !== null) chipsEl.scrollLeft = prevChipsX;
+      const sel = chipsEl.querySelector('[aria-selected="true"]');
+      if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }
+  if (prevChipsX !== null) window.scrollTo(0, prevY);
+}
+
+function renderStats() {
+  const played = matches.filter((m) => m.status === 'activ' && !isUpcoming(m));
+  const seasons = [...new Set(matches.map((m) => m.season).filter(Boolean))].sort().reverse();
+  const season = renderStats.season || seasons[0] || null;
+  const inSeason = played.filter((m) => !season || m.season === season);
+  const by = (fn) => inSeason.reduce((acc, m) => { const k = fn(m); acc[k] = (acc[k] || 0) + 1; return acc; }, {});
+  const roles = by((m) => roleLabel(m).replace(/ \d$/, ''));
+  const comps = by((m) => m.competition || 'Altele');
+  const km = inSeason.reduce((s, m) => s + Number(m.distance_km || 0), 0);
+  const fee = inSeason.reduce((s, m) => s + Number(m.fee_amount || 0), 0);
+  const unpaid = inSeason.filter((m) => m.fee_amount && !m.fee_paid).reduce((s, m) => s + Number(m.fee_amount), 0);
+  const bars = (obj) => {
+    const entries = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...entries.map((e) => e[1]));
+    return entries.map(([k, v]) => `<div class="bar"><span>${esc(k)}</span><b>${v}</b><i style="--w:${(v / max) * 100}%"></i></div>`).join('');
+  };
+  $('#view').innerHTML = `
+    ${seasons.length > 1 ? `<div class="tabs" style="position:static;border:0;padding:16px 0 0">${seasons.map((s) => `<button data-season="${esc(s)}" aria-selected="${s === season}">Sezon ${esc(s)}</button>`).join('')}</div>` : ''}
+    <div class="stats-grid">
+      <div class="stat"><b>${inSeason.length}</b><span>meciuri jucate${season ? ' în ' + esc(season) : ''}</span></div>
+      <div class="stat"><b>${(roles['Central'] || 0)}</b><span>la centru</span></div>
+      <div class="stat"><b>${Math.round(km).toLocaleString('ro-RO')}</b><span>km până la terenuri (dus)</span></div>
+      <div class="stat"><b>${fee ? Math.round(fee).toLocaleString('ro-RO') : '–'}</b><span>${fee ? 'lei barem' + (unpaid ? `, ${fmt.money(unpaid)} neîncasați` : '') : 'lei barem (completezi la fiecare meci)'}</span></div>
+    </div>
+    ${inSeason.length ? `
+    <div class="bars"><h3>Pe competiții</h3>${bars(comps)}</div>
+    <div class="bars"><h3>Pe rol</h3>${bars(roles)}</div>` : ''}
+    <button class="logout" id="logout" type="button">Ieși din cont</button>`;
+}
+
+/* ---------- foaia meciului ---------- */
+function openMatch(id, { push = true } = {}) {
+  const m = matches.find((x) => x.match_id === id);
+  if (!m) return;
+  const d = parseLocal(m.start_local);
+  const crew = [...(m.match_officials || [])].sort((a, b) => roleOrder(a) - roleOrder(b));
+  const sh = $('#sheet');
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="board">
+        <div class="club" id="sheetTitle">${esc(m.home_club)}</div>
+        <div>${hasScore(m)
+          ? `<div class="big">${m.home_goals}–${m.away_goals}</div>${m.home_half_goals !== null && m.home_half_goals !== undefined ? `<div class="half">pauză ${m.home_half_goals}–${m.away_half_goals}</div>` : ''}`
+          : `<div class="vs">${fmt.time(d)}</div>`}</div>
+        <div class="club">${esc(m.away_club)}</div>
+      </div>
+      ${m.status === 'anulat' ? `<div class="cancel-note">Delegare anulată${m.cancelled_at ? ' pe ' + new Date(m.cancelled_at).toLocaleDateString('ro-RO') : ''}. Rămâne în arhivă.</div>` : ''}
+    </div>
+
+    <div class="sec">
+      <h2>Meciul</h2>
+      <dl class="facts">
+        <div><dt>Data</dt><dd>${esc(fmt.full(d))}, ${fmt.time(d)}</dd></div>
+        <div><dt>Competiție</dt><dd>${esc(m.competition)}${m.series ? ', ' + esc(m.series) : ''}</dd></div>
+        ${m.round_no ? `<div><dt>Etapa</dt><dd>${m.round_no}${m.stage ? ', ' + esc(m.stage) : ''}</dd></div>` : ''}
+        <div><dt>Categorie</dt><dd>${esc([m.age_group, m.category, m.sport].filter(Boolean).join(', '))}</dd></div>
+        <div><dt>Stadion</dt><dd>${esc(m.stadium)}</dd></div>
+        ${m.distance_km ? `<div><dt>Distanță</dt><dd>${fmt.km(m.distance_km)} (dus)</dd></div>` : ''}
+        <div><dt>Rolul meu</dt><dd>${esc(roleLabel(m))}${m.is_confirmed ? ', confirmat' : ', neconfirmat'}</dd></div>
+        <div><dt>Sezon</dt><dd>${esc(m.season || '–')}</dd></div>
+        <div><dt>Sursa</dt><dd>${m.source === 'ajfalba' ? 'ajfalba.ro' : m.source === 'manual' ? 'adăugat de mână' : 'Football Connect'}</dd></div>
+      </dl>
+
+      ${crew.length ? `<h2>Brigada</h2>
+      <ul class="crew">${crew.map((o) => `<li class="${o.is_me ? 'me' : ''}"><span>${esc(o.first_name)} ${esc(o.last_name)}${o.is_me ? ' (eu)' : ''}</span><span class="r">${esc(officialRole(o))}</span></li>`).join('')}</ul>` : ''}
+
+      <h2>Barem</h2>
+      <form class="mine" id="feeForm">
+        <div class="seg" role="radiogroup" aria-label="Cui faci factura">
+          ${Object.entries(BILLING).map(([v, t]) => `<label><input type="radio" name="bill" value="${v}" ${billingOf(m) === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+        </div>
+        <div class="fee-hint">${billingOf(m) === 'ajf' ? 'Intră în factura lunară către AJF.'
+          : billingOf(m) === 'ajf_club' ? `Factura merge la AJF, separat pentru ${esc(m.fee_payer || m.home_club)}, cu transport.`
+          : 'Încasezi direct, pe meci, cu transport.'}</div>
+        <label>Barem (lei)
+          <input type="number" id="fFee" step="1" min="0" inputmode="decimal" value="${m.fee_amount ?? ''}" placeholder="Completează suma">
+        </label>
+        <div class="fee-hint">${feeHint(m)}</div>
+        ${billingOf(m) !== 'ajf' && m.transport_with ? `
+          <div class="note">Transportul pentru drumul din ziua asta e decontat la ${esc(leaderTime(m))}.</div>
+          <label class="check"><input type="checkbox" id="fSep"> Am făcut drum separat pentru acest meci</label>`
+        : billingOf(m) !== 'ajf' ? `
+          ${m.transport_separate ? '<label class="check"><input type="checkbox" id="fSep" checked> Drum separat (primește transport și acest meci)</label>' : ''}
+          <div class="two">
+            <label>Km dus-întors
+              <input type="number" id="fKm" step="0.1" min="0" inputmode="decimal" value="${m.transport_km ?? ''}">
+            </label>
+            <label>Preț carburant (lei/l)
+              <input type="number" id="fFuel" step="0.01" min="0" inputmode="decimal" value="${m.fuel_price ?? ''}" placeholder="${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' (implicit)' : 'nesetat'}">
+            </label>
+          </div>
+          <label>Merg până la (apare pe factură)
+            <input type="text" id="fTo" value="${esc(m.transport_to || '')}" placeholder="${esc(m.venue_city || 'ex. Blaj')}">
+          </label>
+          <div class="fee-hint">Pe factură: Transport: ${esc(routeOf(m))}</div>
+          <label>Sumă transport (lei)
+            <input type="number" id="fTrAmount" step="0.01" min="0" inputmode="decimal" value="${m.transport_manual_amount ?? ''}" placeholder="${m.transport_manual_amount == null && m.transport_amount != null ? String(m.transport_amount).replace('.', ',') + ' (din formulă)' : 'gol = calculez din km'}">
+          </label>
+          <div class="fee-hint">${m.transport_manual_amount != null
+            ? `Transport: ${lei(m.transport_amount)}, sumă pusă de tine. Golește câmpul ca să revii la formulă. Total: <b>${lei(totalOf(m))}</b>.`
+            : m.transport_amount != null
+            ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>. Dacă vrei altă sumă, scrie-o mai sus.`
+            : 'Pune suma direct mai sus, sau km și prețul carburantului ca să se calculeze.'}
+            ${m.transport_manual_amount != null ? '' : (m.source === 'fc' ? 'Km propuși sunt distanța din Football Connect × 2. ' : '') + 'Pune distanța reală dus-întors, de exemplu până unde te întâlnești cu colegul.'}</div>` : ''}
+        ${billingOf(m) === 'frf' ? `
+          <label>Plătește
+            <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
+          </label>
+          <label class="check"><input type="checkbox" id="fPaid" ${m.fee_paid ? 'checked' : ''}> Încasat${m.fee_paid && m.fee_paid_at ? ' pe ' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') : ''}</label>`
+        : `<div class="note">${m.fee_paid ? 'Încasat odată cu factura' + (m.fee_paid_at ? ' (' + new Date(m.fee_paid_at).toLocaleDateString('ro-RO') + ')' : '') + '.' : 'Se încasează cu factura lunii. Marchezi plata din tab-ul Barem.'}</div>`}
+        <button class="primary" type="submit" id="fFeeSave">Salvează barem-ul</button>
+      </form>
+      ${m.source === 'manual' ? `<button class="logout" type="button" id="delMatch">Șterge meciul (adăugat de mână)</button>` : ''}
+
+      <h2>Notițele mele</h2>
+      <form class="mine" id="mine">
+        <label>Observații
+          <textarea id="fNotes" placeholder="Teren, faze, ce a zis observatorul…">${esc(m.notes || '')}</textarea>
+        </label>
+        <label>Nota observatorului
+          <input type="number" id="fGrade" step="0.01" min="0" max="10" inputmode="decimal" value="${m.observer_grade ?? ''}">
+        </label>
+        <button class="primary" type="submit" id="fSave">Salvează notițele</button>
+      </form>
+    </div>`;
+  sh.classList.remove('hidden');
+  if (push) {
+    sh.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+    $('#back').focus();
+    history.pushState({ sheet: id }, '');
+  }
+
+  $('#back').onclick = () => history.back();
+  const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
+
+  async function save(patch, btn, label, msg) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Se salvează…'; }
+    const { data, error } = await sb.from('matches').update(patch).eq('match_id', id).select('*');
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (error) { toast('Nu s-a salvat: ' + error.message); return false; }
+    Object.assign(m, data?.[0] || patch);
+    store.set('meciuri_cache', matches);
+    toast(msg);
+    render();
+    return true;
+  }
+
+  $('#mine').onsubmit = (ev) => {
+    ev.preventDefault();
+    save({ notes: $('#fNotes').value.trim() || null, observer_grade: num($('#fGrade').value) },
+      $('#fSave'), 'Salvează notițele', 'Notițe salvate');
+  };
+
+  // tipul facturii se salvează imediat (schimbă tariful, plătitorul și transportul)
+  sh.querySelectorAll('input[name=bill]').forEach((r) => r.onchange = async () => {
+    const patch = { billing: r.value, billing_manual: true, organizer: r.value === 'ajf' ? 'AJF' : 'FRF', organizer_manual: true };
+    if (await save(patch, null, '', 'Mutat la ' + BILLING[r.value])) {
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  });
+
+  const del = $('#delMatch');
+  if (del) del.onclick = async () => {
+    if (!confirm('Ștergi meciul ' + m.home_club + ' – ' + m.away_club + '?')) return;
+    const { error } = await sb.from('matches').delete().eq('match_id', id).eq('source', 'manual');
+    if (error) { toast('Nu s-a șters: ' + error.message); return; }
+    matches = matches.filter((x) => x.match_id !== id);
+    store.set('meciuri_cache', matches);
+    toast('Meci șters');
+    history.back();
+    render();
+  };
+
+  const reset = sh.querySelector('[data-reset-fee]');
+  if (reset) reset.onclick = async () => {
+    if (await save({ fee_manual: false }, null, '', 'Suma readusă la barem')) {
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  };
+
+  $('#feeForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const amount = num($('#fFee').value);
+    const patch = {};
+    if (amount !== (m.fee_amount === null || m.fee_amount === undefined ? null : Number(m.fee_amount))) {
+      patch.fee_amount = amount;
+      patch.fee_manual = amount !== null;   // gol = revino la barem
+    }
+    if (billingOf(m) !== 'ajf' && $('#fKm')) {
+      const km = num($('#fKm').value), fuel = num($('#fFuel').value), trAmount = num($('#fTrAmount').value);
+      if (trAmount !== (m.transport_manual_amount == null ? null : Number(m.transport_manual_amount))) patch.transport_manual_amount = trAmount;
+      if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
+      if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
+      const to = $('#fTo').value.trim() || null;
+      if (to !== (m.transport_to || null)) patch.transport_to = to;
+    }
+    if ($('#fSep') && $('#fSep').checked !== !!m.transport_separate) patch.transport_separate = $('#fSep').checked;
+    if (billingOf(m) === 'frf') {
+      patch.fee_payer = $('#fPayer').value.trim() || null;
+      if ($('#fPaid').checked !== !!m.fee_paid) patch.fee_paid = $('#fPaid').checked;
+    }
+    if (!Object.keys(patch).length) { toast('Nimic de salvat'); return; }
+    if (await save(patch, $('#fFeeSave'), 'Salvează barem-ul', 'Barem salvat')) {
+      // transportul altor meciuri din aceeași zi se poate schimba pe server
+      if ('transport_km' in patch || 'transport_separate' in patch || 'fuel_price' in patch || 'transport_manual_amount' in patch) { try { await loadFromDb(); render(); } catch {} }
+      const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
+    }
+  };
+}
+
+function leaderShort(m) {
+  const l = matches.find((x) => x.match_id === m.transport_with);
+  return l ? fmt.time(parseLocal(l.start_local)) : 'alt meci';
+}
+function leaderTime(m) {
+  const l = matches.find((x) => x.match_id === m.transport_with);
+  if (!l) return 'primul meci din zi';
+  const d = parseLocal(l.start_local);
+  return `meciul de la ${fmt.time(d)}${l.age_group && l.age_group !== 'Seniori' ? ' (' + l.age_group + ')' : ''}`;
+}
+
+function feeHint(m) {
+  const split = m.fee_hg || m.fee_team
+    ? ` (${[m.fee_hg ? lei(m.fee_hg) + ' HG' : '', m.fee_team ? lei(m.fee_team) + ' echipă' : ''].filter(Boolean).join(' + ')})` : '';
+  if (m.fee_manual) return `Sumă pusă de tine. <button type="button" data-reset-fee>Revino la barem</button>`;
+  if (m.fee_label) return `Din barem-ul ${esc(m.organizer === 'FRF' ? 'FRF' : 'AJF 26-27')}: ${esc(m.fee_label)}${split}.`;
+  return 'Competiția nu e în barem (ex. seniori FRF). Completează suma de mână.';
+}
+function closeSheet() {
+  $('#sheet').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+window.addEventListener('popstate', () => { if (!$('#sheet').classList.contains('hidden')) closeSheet(); });
+
+/* ---------- evenimente ---------- */
+document.addEventListener('submit', (e) => {
+  if (e.target.id === 'setForm') saveSettings(e);
+});
+document.addEventListener('change', (e) => {
+  const p = e.target.closest('input[data-pay]');
+  if (p) setMatchPaid(p.dataset.pay, p.checked);
+});
+document.addEventListener('keydown', (e) => {
+  const item = e.target.closest('div[data-id][role=button]');
+  if (item && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openMatch(item.dataset.id); }
+});
+document.addEventListener('click', (e) => {
+  if (e.target.closest('input[data-pay]')) return;
+  const inv = e.target.closest('button[data-invoice]');
+  if (inv) { openInvoice(inv.dataset.invoice); return; }
+  if (e.target.closest('#addMatch')) { openAdd(); return; }
+  const item = e.target.closest('[data-id]');
+  if (item) { openMatch(item.dataset.id); return; }
+  const t = e.target.closest('.tabs button[data-tab]');
+  if (t) { tab = t.dataset.tab; render(); return; }
+  if (e.target.closest('button[data-settings]')) {
+    store.set('meciuri_open_settings', !(store.get('meciuri_open_settings', false) === true));
+    renderBarem();
+    return;
+  }
+  const bm = e.target.closest('button[data-bmonth]');
+  if (bm) {
+    let open = store.get('meciuri_open_barem', null);
+    if (!Array.isArray(open)) open = [...document.querySelectorAll('.msec.open [data-bmonth]')].map((b) => b.dataset.bmonth);
+    const k = bm.dataset.bmonth;
+    open = open.includes(k) ? open.filter((x) => x !== k) : [...open, k];
+    store.set('meciuri_open_barem', open);
+    renderBarem();
+    return;
+  }
+  const mh = e.target.closest('button[data-month]');
+  if (mh) {
+    let open = store.get('meciuri_open_months', null);
+    if (!Array.isArray(open)) open = [...document.querySelectorAll('.msec.open [data-month]')].map((b) => b.dataset.month);
+    const k = mh.dataset.month;
+    open = open.includes(k) ? open.filter((x) => x !== k) : [...open, k];
+    store.set('meciuri_open_months', open);
+    renderList();
+    return;
+  }
+  const cat = e.target.closest('button[data-cat]');
+  if (cat) { playedCat = cat.dataset.cat; store.set('meciuri_cat', playedCat); renderList(); return; }
+  const s = e.target.closest('button[data-season]');
+  if (s) { renderStats.season = s.dataset.season; renderStats(); return; }
+  if (e.target.closest('#logout')) logout();
+});
+$('#syncBtn').addEventListener('click', () => refresh({ fromFc: true }));
+
+// la revenirea în aplicație (din Gmail, de exemplu) verifică din nou
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !$('#app').classList.contains('hidden')) {
+    const stale = !lastSync || Date.now() - new Date(lastSync) > 60 * 1000;
+    if (stale) refresh({ fromFc: true });
+  }
+});
+
+/* ---------- autentificare ---------- */
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $('#lBtn'); btn.disabled = true; $('#lErr').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email: $('#lEmail').value.trim().toLowerCase(), password: $('#lPass').value });
+  btn.disabled = false;
+  if (error) { $('#lErr').textContent = error.message === 'Invalid login credentials' ? 'Email sau parolă greșită.' : error.message; return; }
+  store.set('meciuri_app_key', $('#lKey').value.trim());
+  showApp();
+});
+
+async function logout() {
+  await sb.auth.signOut();
+  store.del('meciuri_cache'); store.del('meciuri_app_key'); store.del('meciuri_last_sync');
+  matches = []; lastSync = null;
+  $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
+}
+
+function showApp() {
+  $('#login').classList.add('hidden');
+  $('#app').classList.remove('hidden');
+  render();                         // întâi ultima listă salvată, instant
+  refresh({ fromFc: true });        // apoi Football Connect
+}
+
+const { data: { session } } = await sb.auth.getSession();
+if (session && store.get('meciuri_app_key')) showApp();
+else $('#login').classList.remove('hidden');
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js').catch(() => {});
+</script>
+</body>
+</html>
