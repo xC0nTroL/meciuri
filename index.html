@@ -133,7 +133,11 @@
   .tag-red { color: var(--red); font-weight: 600; }
 
   .empty { text-align: center; color: var(--muted); padding: 48px 12px; }
-  .empty .whistle { display: block; margin: 0 auto 14px; color: var(--accent); opacity: .9; }
+  .empty .whistle { position: relative; display: block; width: 180px; margin: 0 auto 18px; }
+  .empty .whistle::before { content: ''; position: absolute; inset: 10% 5%; border-radius: 50%; background: radial-gradient(closest-side, rgba(217,191,134,0.28), transparent); filter: blur(18px); }
+  .empty .whistle img { position: relative; display: block; width: 100%; height: auto; transform: rotate(-6deg); }
+  @media (prefers-reduced-motion: no-preference) { .empty .whistle img { animation: bob 4s ease-in-out infinite; } }
+  @keyframes bob { 50% { transform: rotate(-3deg) translateY(-6px); } }
   .empty b { display: block; color: var(--ink); font-family: var(--display); font-size: 22px; margin-bottom: 4px; }
 
   /* ---------- statistici ---------- */
@@ -1211,7 +1215,7 @@ function renderList() {
 
   if (!list.length) {
     view.innerHTML = (tab === 'upcoming'
-      ? '<div class="empty"><svg class="whistle" width="72" height="72" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13a6 6 0 1 1 12 0a6 6 0 1 1-12 0"/><path d="M19 17l6 6"/><path d="M24 26h30v10H40"/><path d="M42 36a14 14 0 1 1-18-10"/><circle cx="28" cy="40" r="4"/></svg><b>Fluierul se odihnește</b>Nicio delegare momentan. Când vine mailul, meciul apare aici.</div>'
+      ? '<div class="empty"><span class="whistle"><img src="img/whistle.png" alt="" width="180" height="124"></span><b>Nicio delegare viitoare</b>Când primești mailul de delegare, meciul apare aici.</div>'
       : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
     return;
   }
