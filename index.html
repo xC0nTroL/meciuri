@@ -228,6 +228,10 @@
   .msec-st { grid-column: 1 / -1; font-size: 13.5px; font-weight: 600; color: var(--red); margin-top: -4px; }
   .msec-st.ok { color: var(--pitch-2); }
   @media (prefers-color-scheme: dark) { .msec-st.ok { color: var(--yellow); } }
+  .set-sec { margin-top: 18px; }
+  .set-t { font-size: 17px; }
+  .set-body { border-top: 1px solid var(--rule); }
+  .set-form { border-radius: 0; background: transparent; }
   .msec-inv { margin: 0; border-radius: 0; border-top: 1px solid var(--rule); }
   .msec-body .row { background: var(--chalk); }
   @media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
@@ -615,7 +619,7 @@ function renderBarem() {
       <div><b>${leiR(paid)}</b><span>încasat</span></div>
       ${laterSum ? `<div class="later">Încă ${leiR(laterSum)} din ${later.length === 1 ? 'delegarea viitoare' : later.length + ' delegări viitoare'}.</div>` : ''}
       ${missing ? `<div class="later">${missing === 1 ? 'Un meci nu are' : missing + ' meciuri nu au'} tarif. Deschide-l și completează suma.</div>` : ''}
-      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului mai jos.</div>' : ''}
+      ${noFuel ? '<div class="later">Transportul nu e calculat: setează prețul carburantului în Setări, jos.</div>' : ''}
     </div>`;
 
   let openB = store.get('meciuri_open_barem', null);
@@ -759,9 +763,17 @@ function openInvoice(key, { push = true } = {}) {
 }
 
 function settingsBox() {
+  const open = store.get('meciuri_open_settings', false) === true;
+  const sum = `Consum ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l · carburant ${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' lei/l' : 'nesetat'}`;
   return `
-    <h2 class="month">Setări barem și transport</h2>
-    <form class="mine" id="setForm">
+    <section class="msec set-sec${open ? ' open' : ''}">
+      <button class="msec-head" type="button" data-settings aria-expanded="${open}">
+        <span class="msec-t set-t">Setări</span>
+        <span class="msec-m">${esc(sum)}</span>
+        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      ${open ? `<div class="set-body">
+    <form class="mine set-form" id="setForm">
       <div class="two">
         <label>Consum (l / 100 km)
           <input type="number" id="sCons" step="0.1" min="0" inputmode="decimal" value="${settings.consum_l_100km ?? ''}">
@@ -781,7 +793,9 @@ function settingsBox() {
         </select>
       </label>
       <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
-    </form>`;
+    </form>
+      </div>` : ''}
+    </section>`;
 }
 
 async function saveSettings(ev) {
@@ -1279,6 +1293,11 @@ document.addEventListener('click', (e) => {
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('.tabs button[data-tab]');
   if (t) { tab = t.dataset.tab; render(); return; }
+  if (e.target.closest('button[data-settings]')) {
+    store.set('meciuri_open_settings', !(store.get('meciuri_open_settings', false) === true));
+    renderBarem();
+    return;
+  }
   const bm = e.target.closest('button[data-bmonth]');
   if (bm) {
     let open = store.get('meciuri_open_barem', null);
