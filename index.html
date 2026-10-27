@@ -230,7 +230,8 @@
   .msec-st { grid-column: 1 / -1; font-size: 13.5px; font-weight: 600; color: var(--red); margin-top: -4px; }
   .msec-st.ok { color: var(--pitch-2); }
   .msec-st.ok { color: var(--yellow); }
-  .set-sec { margin-top: 18px; }
+  .top-actions { display: flex; gap: 8px; flex: none; }
+  #setForm { margin-top: 18px; }
   .set-t { font-size: 17px; }
   .set-body { border-top: 1px solid var(--rule); }
   .set-form { border-radius: 0; background: transparent; }
@@ -543,17 +544,19 @@
     .hero-time { font-size: 48px; }
     .hero-when { flex-direction: column; align-items: flex-start; gap: 4px; }
     .hero-date { text-align: left; padding: 0; }
-    .bottom-nav { left: 24px; right: auto; width: calc(var(--side) - 48px); max-width: none; top: auto; bottom: 28px; margin: 0;
-      height: auto; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 22px; z-index: 17; box-shadow: none; }
-    .bottom-nav button { flex-direction: row; justify-content: flex-start; gap: 12px; height: 46px; padding: 0 16px; border-radius: 15px; font-size: 14.5px; }
-    .bottom-nav button svg { width: 20px; height: 20px; }
-    .bottom-nav button:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
-    main { margin-left: var(--side); max-width: 820px; padding: 36px 48px 64px; }
+    .bottom-nav { position: fixed; top: 20px; bottom: auto; right: auto; margin: 0; max-width: none; height: auto; width: auto;
+      left: calc(var(--side) + (100vw - var(--side)) / 2); transform: translateX(-50%);
+      display: flex; flex-direction: row; gap: 4px; padding: 5px; border-radius: 999px; z-index: 17;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    .bottom-nav button { flex-direction: row; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px; font-size: 14px; white-space: nowrap; }
+    .bottom-nav button svg { width: 18px; height: 18px; }
+    .bottom-nav button:hover:not([aria-selected="true"]) { background: rgba(255,255,255,0.06); color: var(--ink); }
+    main { margin-left: var(--side); max-width: 820px; padding: 92px 48px 64px; }
     @supports (width: 1px) { main { margin-left: max(var(--side), calc(var(--side) + (100vw - var(--side) - 820px) / 2 - 8px)); } }
     .ticket { transition: transform .15s ease, border-color .15s ease; }
     .ticket:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.2); }
     .empty { padding-top: 12vh; }
-    .sheet { left: var(--side); }
+    .sheet { left: var(--side); z-index: 18; }
     .sheet::before { left: var(--side); }
     .sheet-head { padding-top: 28px; }
   }
@@ -591,9 +594,14 @@
         <h1>Meciurile mele</h1>
         <div class="sync-state" id="syncState">Se încarcă…</div>
       </div>
+      <div class="top-actions">
+      <button class="sync-btn hidden" id="setBtn" type="button" aria-label="Setări transport și barem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3.6 17.4a1.9 1.9 0 0 0 2.7 2.7l5.9-5.9a4 4 0 0 0 5.2-5.2l-2.6 2.6-2.5-.4-.4-2.5z"/></svg>
+      </button>
       <button class="sync-btn" id="syncBtn" type="button" aria-label="Verifică delegări noi">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>
       </button>
+      </div>
     </div>
     <div class="next-wrap">
       <div id="next"></div>
@@ -773,6 +781,7 @@ function render() {
   $('#syncState').textContent = ago(lastSync);
   renderNext();
   document.querySelectorAll('.bottom-nav button[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  $('#setBtn').classList.toggle('hidden', tab !== 'barem');
   if (tab === 'stats') renderStats();
   else if (tab === 'barem') renderBarem();
   else renderList();
@@ -837,7 +846,7 @@ function renderBarem() {
   const played = matches.filter((m) => counts(m) && !isUpcoming(m));
   const later = matches.filter((m) => counts(m) && isUpcoming(m));
   if (!played.length && !later.length) {
-    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>' + settingsBox();
+    $('#view').innerHTML = '<div class="empty"><b>Niciun meci încă</b>Barem-ul apare aici după primul meci.</div>';
     return;
   }
   const due = sumOf(played.filter((m) => !m.fee_paid));
@@ -906,7 +915,7 @@ function renderBarem() {
     html += '</div></section>';
   }
   const prevY = window.scrollY;
-  $('#view').innerHTML = html + settingsBox();
+  $('#view').innerHTML = html;
   window.scrollTo(0, prevY);
 }
 
@@ -1011,17 +1020,17 @@ function openInvoice(key, { push = true } = {}) {
   };
 }
 
-function settingsBox() {
-  const open = store.get('meciuri_open_settings', false) === true;
-  const sum = `Consum ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l · carburant ${settings.pret_carburant ? String(settings.pret_carburant).replace('.', ',') + ' lei/l' : 'nesetat'}`;
-  return `
-    <section class="msec set-sec${open ? ' open' : ''}">
-      <button class="msec-head" type="button" data-settings aria-expanded="${open}">
-        <span class="msec-t set-t">Setări</span>
-        <span class="msec-m">${esc(sum)}</span>
-        <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+function openSettings() {
+  const sh = $('#sheet');
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
       </button>
-      ${open ? `<div class="set-body">
+      <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">Setări</div></div>
+    </div>
+    <div class="sec">
     <form class="mine set-form" id="setForm">
       <div class="two">
         <label>Consum (l / 100 km)
@@ -1043,8 +1052,12 @@ function settingsBox() {
       </label>
       <button class="primary" type="submit" id="sSave">Salvează și recalculează</button>
     </form>
-      </div>` : ''}
-    </section>`;
+    </div>`;
+  sh.classList.remove('hidden');
+  sh.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  history.pushState({ sheet: 'set' }, '');
+  $('#back').onclick = () => history.back();
 }
 
 async function saveSettings(ev) {
@@ -1062,7 +1075,8 @@ async function saveSettings(ev) {
   store.set('meciuri_settings', settings);
   if (err) { toast('Nu s-a salvat: ' + err.message); btn.disabled = false; btn.textContent = 'Salvează și recalculează'; return; }
   await loadFromDb();
-  toast('Transport recalculat');
+  toast('Salvat, transport recalculat');
+  if (!$('#sheet').classList.contains('hidden')) history.back();
   render();
 }
 
@@ -1579,11 +1593,7 @@ document.addEventListener('click', (e) => {
   if (item) { openMatch(item.dataset.id); return; }
   const t = e.target.closest('button[data-tab]');
   if (t) { if (!$('#sheet').classList.contains('hidden')) history.back(); tab = t.dataset.tab; render(); return; }
-  if (e.target.closest('button[data-settings]')) {
-    store.set('meciuri_open_settings', !(store.get('meciuri_open_settings', false) === true));
-    renderBarem();
-    return;
-  }
+  if (e.target.closest('#setBtn')) { openSettings(); return; }
   const bm = e.target.closest('button[data-bmonth]');
   if (bm) {
     let open = store.get('meciuri_open_barem', null);
