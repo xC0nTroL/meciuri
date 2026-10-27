@@ -650,7 +650,7 @@ function openInvoice(key, { push = true } = {}) {
         ${lines.map((l) => `
           <li${l.price == null ? ' class="missing"' : ''}>
             <div class="ln-main"><b>${esc(l.name)}</b><span>${esc(l.desc)}</span>
-              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? (l.transport ? 'completează km în foaia meciului' : 'fără tarif') : money2(l.price) + ' lei'}${l.transport ? ` · ${String(l.m.transport_km ?? '').replace('.', ',')} km` : ''}</span>
+              <span class="ln-meta">${esc(l.um)} · ${l.qty} × ${l.price == null ? (l.transport ? 'completează km în foaia meciului' : 'fără tarif') : money2(l.price) + ' lei'}${l.transport ? (l.m.transport_manual_amount != null ? ' · sumă pusă de tine' : l.m.transport_km != null ? ` · ${String(l.m.transport_km).replace('.', ',')} km` : '') : ''}</span>
               ${l.transport ? `<label class="to-field">Merg până la
                 <input type="text" data-to="${l.m.match_id}" value="${esc(l.m.transport_to || '')}" placeholder="${esc(l.m.venue_city || 'ex. Blaj')}" enterkeyhint="done">
               </label>` : ''}</div>
@@ -1000,10 +1000,15 @@ function openMatch(id, { push = true } = {}) {
             <input type="text" id="fTo" value="${esc(m.transport_to || '')}" placeholder="${esc(m.venue_city || 'ex. Blaj')}">
           </label>
           <div class="fee-hint">Pe factură: Transport: ${esc(routeOf(m))}</div>
-          <div class="fee-hint">${m.transport_amount != null
-            ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>.`
-            : 'Transportul se calculează după ce pui km și prețul carburantului.'}
-            ${m.source === 'fc' ? 'Km propuși sunt distanța din Football Connect × 2. ' : ''}Pune distanța reală dus-întors, de exemplu până unde te întâlnești cu colegul.</div>` : ''}
+          <label>Sumă transport (lei)
+            <input type="number" id="fTrAmount" step="0.01" min="0" inputmode="decimal" value="${m.transport_manual_amount ?? ''}" placeholder="${m.transport_manual_amount == null && m.transport_amount != null ? String(m.transport_amount).replace('.', ',') + ' (din formulă)' : 'gol = calculez din km'}">
+          </label>
+          <div class="fee-hint">${m.transport_manual_amount != null
+            ? `Transport: ${lei(m.transport_amount)}, sumă pusă de tine. Golește câmpul ca să revii la formulă. Total: <b>${lei(totalOf(m))}</b>.`
+            : m.transport_amount != null
+            ? `Transport: ${lei(m.transport_amount)} (${String(m.transport_km).replace('.', ',')} km × ${String(settings.consum_l_100km ?? 7.5).replace('.', ',')} l/100 km × ${String(m.fuel_price ?? settings.pret_carburant).replace('.', ',')} lei/l). Total: <b>${lei(totalOf(m))}</b>. Dacă vrei altă sumă, scrie-o mai sus.`
+            : 'Pune suma direct mai sus, sau km și prețul carburantului ca să se calculeze.'}
+            ${m.transport_manual_amount != null ? '' : (m.source === 'fc' ? 'Km propuși sunt distanța din Football Connect × 2. ' : '') + 'Pune distanța reală dus-întors, de exemplu până unde te întâlnești cu colegul.'}</div>` : ''}
         ${billingOf(m) === 'frf' ? `
           <label>Plătește
             <input type="text" id="fPayer" value="${esc(m.fee_payer || m.home_club || '')}">
@@ -1090,7 +1095,8 @@ function openMatch(id, { push = true } = {}) {
       patch.fee_manual = amount !== null;   // gol = revino la barem
     }
     if (billingOf(m) !== 'ajf' && $('#fKm')) {
-      const km = num($('#fKm').value), fuel = num($('#fFuel').value);
+      const km = num($('#fKm').value), fuel = num($('#fFuel').value), trAmount = num($('#fTrAmount').value);
+      if (trAmount !== (m.transport_manual_amount == null ? null : Number(m.transport_manual_amount))) patch.transport_manual_amount = trAmount;
       if (km !== (m.transport_km == null ? null : Number(m.transport_km))) patch.transport_km = km;
       if (fuel !== (m.fuel_price == null ? null : Number(m.fuel_price))) patch.fuel_price = fuel;
       const to = $('#fTo').value.trim() || null;
@@ -1104,7 +1110,7 @@ function openMatch(id, { push = true } = {}) {
     if (!Object.keys(patch).length) { toast('Nimic de salvat'); return; }
     if (await save(patch, $('#fFeeSave'), 'Salvează barem-ul', 'Barem salvat')) {
       // transportul altor meciuri din aceeași zi se poate schimba pe server
-      if ('transport_km' in patch || 'transport_separate' in patch || 'fuel_price' in patch) { try { await loadFromDb(); render(); } catch {} }
+      if ('transport_km' in patch || 'transport_separate' in patch || 'fuel_price' in patch || 'transport_manual_amount' in patch) { try { await loadFromDb(); render(); } catch {} }
       const top = sh.scrollTop; openMatch(id, { push: false }); sh.scrollTop = top;
     }
   };
