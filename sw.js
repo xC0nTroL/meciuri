@@ -1,6 +1,6 @@
 // Service worker: păstrează aplicația în cache ca să se deschidă și fără semnal.
 // Datele (Supabase, Apps Script) merg mereu la rețea; ultima listă e salvată de aplicație.
-const CACHE = 'meciuri-v13';
+const CACHE = 'meciuri-v14';
 const SHELL = ['./', './index.html', './manifest.json', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -23,8 +23,10 @@ self.addEventListener('fetch', (e) => {
   const asset = sameOrigin || url.hostname.endsWith('jsdelivr.net') ||
                 url.hostname.endsWith('fonts.googleapis.com') || url.hostname.endsWith('fonts.gstatic.com');
   if (!asset) return;
+  // fișierele aplicației: ocolesc cache-ul HTTP (GitHub Pages ține 10 minute), ca o versiune nouă să apară imediat
+  const net = sameOrigin ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request);
   e.respondWith(
-    fetch(e.request)
+    net
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
         return res;
