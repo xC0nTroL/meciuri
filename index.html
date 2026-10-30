@@ -1584,6 +1584,10 @@ function openMatch(id, { push = true } = {}) {
   $('#back').onclick = () => history.back();
   const cBtn = $('#fcConfirm');
   if (cBtn) cBtn.onclick = () => confirmFc(id, cBtn, true);
+  // contactele noi (ex. după rularea SQL-ului) apar fără repornirea aplicației
+  if (push) { const before = contacts.length; loadContacts().then(() => {
+    if (contacts.length !== before && !$('#sheet').classList.contains('hidden') && history.state?.sheet === id) openMatch(id, { push: false });
+  }).catch(() => {}); }
   const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
 
   async function save(patch, btn, label, msg) {
