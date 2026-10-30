@@ -762,7 +762,7 @@ async function syncFromFc() {
   const key = store.get('meciuri_app_key');
   if (!key) return null;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
+  const timer = setTimeout(() => ctrl.abort(), 60000);
   try {
     const res = await fetch(CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key), { signal: ctrl.signal });
     const j = await res.json();
