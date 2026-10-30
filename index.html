@@ -235,6 +235,9 @@
   .msec-st { grid-column: 1 / -1; font-size: 13.5px; font-weight: 600; color: var(--red); margin-top: -4px; }
   .msec-st.ok { color: var(--pitch-2); }
   .msec-st.ok { color: var(--yellow); }
+  .confirm-box { margin: 16px 16px 0; padding: 14px; border-radius: 14px; display: grid; gap: 10px; font-size: 14px; color: var(--ink);
+    background: rgba(217,191,134,0.12); border: 1px solid rgba(217,191,134,0.4); }
+  .hero-pills .pill-warn { background: rgba(217,191,134,0.18); color: var(--accent); }
   .top-actions { display: flex; gap: 8px; flex: none; }
   #setForm { margin-top: 18px; }
   .set-t { font-size: 17px; }
@@ -712,6 +715,7 @@ function officialRole(o) {
   return 'Oficial';
 }
 const roleOrder = (o) => o.observer_role_id ? 9 : o.role_id === 1 ? 0 : o.role_id === 2 ? 1 + (o.position || 0) : 5;
+const needsConfirm = (m) => m.source === 'fc' && m.status === 'activ' && !m.is_confirmed && isUpcoming(m);
 const hasScore = (m) => m.home_goals !== null && m.home_goals !== undefined && m.away_goals !== null && m.away_goals !== undefined;
 const isUpcoming = (m) => { const d = parseLocal(m.start_local); return d && d.getTime() > Date.now() - 2 * 3600 * 1000; };
 
@@ -1201,7 +1205,7 @@ function renderNext() {
         <span class="hero-top"><span class="hero-chip">Următoarea delegare</span><span class="hero-in">${esc(inDays)}</span></span>
         <span class="hero-when"><span class="hero-time">${fmt.time(d)}</span><span class="hero-date">${esc(wd[0].toUpperCase() + wd.slice(1))}, ${esc(fmt.dayMon(d))}</span></span>
         <span class="hero-teams">${esc(m.home_club)} – ${esc(m.away_club)}</span>
-        <span class="hero-pills">${pills.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
+        <span class="hero-pills">${needsConfirm(m) ? '<span class="pill-warn">Neconfirmat</span>' : ''}${pills.map((x) => `<span>${esc(x)}</span>`).join('')}</span>
       </button>`;
   }
   el.innerHTML = hero;
@@ -1399,6 +1403,7 @@ function openMatch(id, { push = true } = {}) {
           : `<div class="vs">${fmt.time(d)}</div>`}</div>
         <div class="club">${esc(m.away_club)}</div>
       </div>
+      ${needsConfirm(m) ? `<div class="confirm-box"><span>Delegarea nu e confirmată în Football Connect.</span><button class="primary" type="button" id="fcConfirm">Confirmă delegarea</button></div>` : ''}
       ${m.status === 'anulat' ? `<div class="cancel-note">Delegare anulată${m.cancelled_at ? ' pe ' + new Date(m.cancelled_at).toLocaleDateString('ro-RO') : ''}. Rămâne în arhivă.</div>` : ''}
     </div>
 
@@ -1487,6 +1492,26 @@ function openMatch(id, { push = true } = {}) {
   }
 
   $('#back').onclick = () => history.back();
+  const cBtn = $('#fcConfirm');
+  if (cBtn) cBtn.onclick = async () => {
+    if (cBtn.dataset.sure !== '1') { cBtn.dataset.sure = '1'; cBtn.textContent = 'Apasă din nou ca să confirmi'; return; }
+    cBtn.disabled = true; cBtn.textContent = 'Se confirmă…';
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      const key = store.get('meciuri_app_key');
+      const res = await fetch(CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key) + '&confirm=' + encodeURIComponent(id), { signal: ctrl.signal });
+      const j = await res.json();
+      if (!j.ok) throw new Error(j.error || 'Confirmarea a eșuat');
+      await loadFromDb();
+      const mm = matches.find((x) => x.match_id === id);
+      if (mm && !mm.is_confirmed) mm.is_confirmed = true;
+      toast('Delegare confirmată în Football Connect');
+      render(); openMatch(id, { push: false });
+    } catch (e) {
+      toast(e.name === 'AbortError' ? 'Football Connect nu a răspuns. Verifică din nou peste un minut.' : 'Nu s-a confirmat: ' + e.message);
+      cBtn.disabled = false; cBtn.dataset.sure = ''; cBtn.textContent = 'Confirmă delegarea';
+    } finally { clearTimeout(timer); }
+  };
   const num = (v) => v === '' ? null : Number(String(v).replace(',', '.'));
 
   async function save(patch, btn, label, msg) {
