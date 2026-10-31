@@ -257,6 +257,18 @@
   .pop-act svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
   .pop-close { margin-top: 4px; border: 0; background: none; color: var(--muted); font: inherit; padding: 10px; cursor: pointer; }
   @media (min-width: 960px) { .pop { align-items: center; } }
+  .unav-banner { margin: 16px 0 0; padding: 16px; border-radius: 18px; display: grid; gap: 12px; font-size: 15px;
+    border-color: rgba(217,191,134,0.45); background: rgba(217,191,134,0.10); }
+  .unav-banner b { color: var(--accent); }
+  .unav-sec { margin-top: 26px; }
+  #unavForm input, #unavForm textarea, #unavForm button { box-sizing: border-box; width: 100%; max-width: 100%; }
+  #unavForm .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+  #unavForm .two > label { min-width: 0; }
+  #unavForm input[type=date] { min-width: 0; -webkit-appearance: none; appearance: none; }
+  .unav-list { list-style: none; margin: 0 0 12px; padding: 4px 14px; border-radius: 14px; background: var(--paper); border: 1px solid var(--glass-edge); }
+  .unav-list li { display: flex; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .unav-list li:last-child { border-bottom: 0; }
+  .unav-list .r { color: var(--muted); font-size: 13.5px; }
   .top-actions { display: flex; gap: 8px; flex: none; }
   #setForm { margin-top: 18px; }
   .set-t { font-size: 17px; }
@@ -734,6 +746,107 @@ function officialRole(o) {
   if (o.role_id) return 'Rezervă';
   return 'Oficial';
 }
+
+/* ---------- indisponibilități (Football Connect) ---------- */
+let unav = store.get('meciuri_unav', null);          // { rows, at }
+let unavLoading = false;
+const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function targetWeek(now = new Date()) {               // luni–vineri din a doua săptămână care urmează
+  const mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7) + 14);
+  const fri = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 4);
+  return { start: isoDay(mon), end: isoDay(fri) };
+}
+const fmtRange = (a, b) => {
+  const A = new Date(a + 'T12:00:00'), B = new Date(b + 'T12:00:00');
+  const mo = (d) => d.toLocaleDateString('ro-RO', { month: 'long' });
+  return A.getMonth() === B.getMonth() ? `${A.getDate()}–${B.getDate()} ${mo(B)}` : `${A.getDate()} ${mo(A)} – ${B.getDate()} ${mo(B)}`;
+};
+const covered = (w) => (unav?.rows || []).some((r) => r.start <= w.start && r.end >= w.end);
+async function loadUnav(force = false) {
+  if (unavLoading || (!force && unav && Date.now() - unav.at < 10 * 60000)) return;
+  const key = store.get('meciuri_app_key'); if (!key) return;
+  unavLoading = true;
+  try {
+    const res = await fetch(CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key) + '&unav=list');
+    const j = await res.json();
+    if (j.ok && Array.isArray(j.rows)) { unav = { rows: j.rows, at: Date.now() }; store.set('meciuri_unav', unav); }
+    else if (j.ok) { unav = { rows: null, at: Date.now(), old: true }; }   // scriptul Google e vechi
+  } catch {} finally { unavLoading = false; }
+  if (tab === 'upcoming') render();
+}
+function unavBanner() {
+  const now = new Date();
+  if (now.getDay() !== 6 || !unav || unav.old) return '';
+  const w = targetWeek(now);
+  if (covered(w)) return '';
+  return `<div class="glass unav-banner"><span><b>E sâmbătă.</b> Dă-te indisponibil pentru ${esc(fmtRange(w.start, w.end))}.</span>
+    <button class="primary" type="button" data-unav-add>Mă dau indisponibil</button></div>`;
+}
+function unavSection() {
+  if (!unav) return '';
+  if (unav.old) return `<div class="unav-sec"><h2 class="month">Indisponibilități</h2><p class="fee-hint">Actualizează scriptul Google ca să le vezi și să le adaugi de aici.</p></div>`;
+  const today = isoDay(new Date());
+  const rows = (unav.rows || []).filter((r) => r.end >= today).sort((a, b) => a.start.localeCompare(b.start));
+  return `<div class="unav-sec"><h2 class="month">Indisponibilități</h2>
+    ${rows.length ? `<ul class="unav-list">${rows.map((r) => `<li><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'trimisă'}</span></li>`).join('')}</ul>` : '<p class="fee-hint">Nicio indisponibilitate viitoare.</p>'}
+    <button class="add-btn" type="button" data-unav-add>Adaugă o indisponibilitate</button></div>`;
+}
+function openUnav() {
+  const w = targetWeek();
+  const last = (unav?.rows || []).slice().sort((a, b) => b.start.localeCompare(a.start))[0];
+  const reason = store.get('meciuri_unav_reason', last?.reason?.trim() || '');
+  const sh = $('#sheet');
+  sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">Indisponibilitate</div></div>
+    </div>
+    <div class="sec">
+      <form class="mine" id="unavForm" style="margin-top:18px">
+        <div class="two">
+          <label>De la <input type="date" id="uStart" required value="${w.start}"></label>
+          <label>Până la <input type="date" id="uEnd" required value="${w.end}"></label>
+        </div>
+        <label>Motiv (cel puțin 20 de caractere)
+          <textarea id="uReason" required minlength="20">${esc(reason)}</textarea>
+        </label>
+        <div class="fee-hint">Se trimite în Football Connect, la fel ca din platformă. Dacă platforma nu permite perioada, îți arată motivul.</div>
+        <button class="primary" type="submit" id="uSave">Trimite în Football Connect</button>
+      </form>
+    </div>`;
+  sh.classList.remove('hidden');
+  sh.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  history.pushState({ sheet: 'unav' }, '');
+  $('#back').onclick = () => history.back();
+  $('#unavForm').onsubmit = async (ev) => {
+    ev.preventDefault();
+    const start = $('#uStart').value, end = $('#uEnd').value, why = $('#uReason').value.trim();
+    if (end < start) { toast('Data de sfârșit e înaintea celei de început'); return; }
+    if (start <= isoDay(new Date())) { toast('Alege o perioadă din viitor'); return; }
+    if (why.length < 20) { toast('Motivul trebuie să aibă cel puțin 20 de caractere'); return; }
+    const btn = $('#uSave'); btn.disabled = true; btn.textContent = 'Se trimite…';
+    const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60000);
+    try {
+      const key = store.get('meciuri_app_key');
+      const url = CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key) + '&unav=add&start=' + start + '&end=' + end + '&reason=' + encodeURIComponent(why);
+      const j = await (await fetch(url, { signal: ctrl.signal })).json();
+      if (!j.ok) throw new Error(j.error || 'Nu s-a trimis');
+      if (!j.added) throw new Error('Scriptul Google nu e actualizat');
+      unav = { rows: j.rows, at: Date.now() }; store.set('meciuri_unav', unav);
+      store.set('meciuri_unav_reason', why);
+      toast('Indisponibilitate trimisă: ' + fmtRange(start, end));
+      history.back(); render();
+    } catch (e) {
+      toast(e.name === 'AbortError' ? 'Football Connect nu a răspuns. Verifică lista înainte să trimiți din nou.' : 'Football Connect a refuzat: ' + e.message);
+      btn.disabled = false; btn.textContent = 'Trimite în Football Connect';
+    } finally { clearTimeout(timer); }
+  };
+}
+
 /* ---------- contacte (Lot arbitri, ajfalba.ro) ---------- */
 let contacts = store.get('meciuri_contacts', []);
 async function loadContacts() {
@@ -1356,6 +1469,7 @@ function renderList() {
     view.innerHTML = (tab === 'upcoming'
       ? '<div class="empty"><span class="whistle"><img src="img/whistle.png?v=3" alt="" width="200" height="152"></span><b>Nicio delegare viitoare</b></div>'
       : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
+    if (tab === 'upcoming') { view.innerHTML = unavBanner() + view.innerHTML + unavSection(); loadUnav(); }
     return;
   }
   const rowHtml = (m) => {
@@ -1375,7 +1489,7 @@ function renderList() {
       </button>`;
   };
 
-  let html = addBtn;
+  let html = (tab === 'upcoming' ? unavBanner() : '') + addBtn;
   if (tab === 'played') {
     // luni care se deschid / închid
     const groups = [];
@@ -1408,6 +1522,7 @@ function renderList() {
       html += rowHtml(m);
     }
   }
+  if (tab === 'upcoming') { html += unavSection(); loadUnav(); }
   // rândul de categorii NU se redesenează dacă e același: Safari pe iPhone i-ar reseta derularea
   const existing = view.querySelector('.chips');
   if (tab === 'played' && existing && existing.dataset.sig === chipsSig && view.querySelector('#listBody')) {
@@ -1715,6 +1830,7 @@ document.addEventListener('click', (e) => {
   if (inv) { openInvoice(inv.dataset.invoice); return; }
   if (e.target.closest('#addMatch')) { openAdd(); return; }
   if (e.target.closest('[data-pop-close]') || e.target.id === 'pop') { closePop(); return; }
+  if (e.target.closest('[data-unav-add]')) { openUnav(); return; }
   const call = e.target.closest('button[data-call]');
   if (call) { const c = contacts.find((x) => x.name === call.dataset.call); if (c) openContact(call.dataset.label, c); return; }
   const cf = e.target.closest('button[data-confirm]');
