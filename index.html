@@ -260,7 +260,12 @@
   .unav-banner { margin: 16px 0 0; padding: 16px; border-radius: 18px; display: grid; gap: 12px; font-size: 15px;
     border-color: rgba(217,191,134,0.45); background: rgba(217,191,134,0.10); }
   .unav-banner b { color: var(--accent); }
-  .unav-sec { margin-top: 26px; }
+  .unav-sec { margin-top: 8px; }
+  .unav-list.past li span:first-child { color: var(--muted); }
+  .bottom-nav button { position: relative; }
+  .bottom-nav .nav-dot { display: none; position: absolute; top: 7px; right: calc(50% - 16px); width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px rgba(22,26,38,0.9); }
+  .bottom-nav button.due .nav-dot { display: block; }
+  @media (max-width: 959px) { .bottom-nav button { font-size: 10.5px; letter-spacing: -0.2px; } }
   #unavForm input, #unavForm textarea, #unavForm button { box-sizing: border-box; width: 100%; max-width: 100%; }
   #unavForm .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
   #unavForm .two > label { min-width: 0; }
@@ -414,7 +419,7 @@
   main { padding: 0 16px calc(var(--safe-bot) + 112px); }
 
   .bottom-nav { position: fixed; z-index: 15; left: 18px; right: 18px; bottom: calc(var(--safe-bot) + 14px); max-width: 520px; margin: 0 auto;
-    height: 62px; border-radius: 31px; padding: 6px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
+    height: 62px; border-radius: 31px; padding: 6px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px;
     background: rgba(20,19,21,0.86); border: 1px solid rgba(255,255,255,0.09);
     backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); box-shadow: 0 -6px 30px rgba(255,138,61,0.12), 0 10px 30px rgba(0,0,0,0.5); }
   .bottom-nav button { border: 0; border-radius: 25px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600;
@@ -658,6 +663,8 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10v18l-3-2-2 2-2-2-3 2zM10 8h4M10 12h4"/></svg>Barem</button>
     <button role="tab" data-tab="stats" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Statistici</button>
+    <button role="tab" data-tab="unav" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v15H4zM4 10h16M9 3v4M15 3v4M10 13.5l4 4M14 13.5l-4 4"/></svg>Indisponibil<i class="nav-dot" aria-hidden="true"></i></button>
   </nav>
 </div>
 
@@ -771,8 +778,8 @@ async function loadUnav(force = false) {
     const j = await res.json();
     if (j.ok && Array.isArray(j.rows)) { unav = { rows: j.rows, at: Date.now() }; store.set('meciuri_unav', unav); }
     else if (j.ok) { unav = { rows: null, at: Date.now(), old: true }; }   // scriptul Google e vechi
-  } catch {} finally { unavLoading = false; }
-  if (tab === 'upcoming') render();
+  } catch { if (!unav) unav = { rows: [], at: Date.now(), failed: true }; } finally { unavLoading = false; }
+  render();
 }
 function unavBanner() {
   const now = new Date();
@@ -782,14 +789,23 @@ function unavBanner() {
   return `<div class="glass unav-banner"><span><b>E sâmbătă.</b> Dă-te indisponibil pentru ${esc(fmtRange(w.start, w.end))}.</span>
     <button class="primary" type="button" data-unav-add>Mă dau indisponibil</button></div>`;
 }
+function renderUnav() {
+  const v = $('#view');
+  if (!unav) { v.innerHTML = '<div class="empty"><b>Se încarcă…</b>Citesc indisponibilitățile din Football Connect.</div>'; loadUnav(); return; }
+  v.innerHTML = unavBanner() + unavSection();
+  loadUnav();
+}
 function unavSection() {
   if (!unav) return '';
   if (unav.old) return `<div class="unav-sec"><h2 class="month">Indisponibilități</h2><p class="fee-hint">Actualizează scriptul Google ca să le vezi și să le adaugi de aici.</p></div>`;
+  if (unav.failed) return `<div class="unav-sec"><p class="fee-hint">Nu am putut citi indisponibilitățile din Football Connect. Încearcă din nou mai târziu.</p><button class="add-btn" type="button" data-unav-add>Adaugă o indisponibilitate</button></div>`;
   const today = isoDay(new Date());
   const rows = (unav.rows || []).filter((r) => r.end >= today).sort((a, b) => a.start.localeCompare(b.start));
-  return `<div class="unav-sec"><h2 class="month">Indisponibilități</h2>
+  const past = (unav.rows || []).filter((r) => r.end < today).sort((a, b) => b.start.localeCompare(a.start));
+  return `<div class="unav-sec"><h2 class="month">Urmează</h2>
     ${rows.length ? `<ul class="unav-list">${rows.map((r) => `<li><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'trimisă'}</span></li>`).join('')}</ul>` : '<p class="fee-hint">Nicio indisponibilitate viitoare.</p>'}
-    <button class="add-btn" type="button" data-unav-add>Adaugă o indisponibilitate</button></div>`;
+    <button class="add-btn" type="button" data-unav-add>Adaugă o indisponibilitate</button>
+    ${past.length ? `<h2 class="month">Trecute</h2><ul class="unav-list past">${past.map((r) => `<li><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'trimisă'}</span></li>`).join('')}</ul>` : ''}</div>`;
 }
 function openUnav() {
   const w = targetWeek();
@@ -985,8 +1001,12 @@ function render() {
   renderNext();
   document.querySelectorAll('.bottom-nav button[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   $('#setBtn').classList.toggle('hidden', tab !== 'barem');
+  const now = new Date();
+  if (!unav) loadUnav();
+  document.querySelector('.bottom-nav [data-tab=unav]').classList.toggle('due', now.getDay() === 6 && !!unav && !unav.old && !covered(targetWeek(now)));
   if (tab === 'stats') renderStats();
   else if (tab === 'barem') renderBarem();
+  else if (tab === 'unav') renderUnav();
   else renderList();
 }
 
@@ -1469,7 +1489,6 @@ function renderList() {
     view.innerHTML = (tab === 'upcoming'
       ? '<div class="empty"><span class="whistle"><img src="img/whistle.png?v=3" alt="" width="200" height="152"></span><b>Nicio delegare viitoare</b></div>'
       : '<div class="empty"><b>Niciun meci arbitrat încă</b>Meciurile apar aici după ce trece data lor.</div>') + addBtn;
-    if (tab === 'upcoming') { view.innerHTML = unavBanner() + view.innerHTML + unavSection(); loadUnav(); }
     return;
   }
   const rowHtml = (m) => {
@@ -1489,7 +1508,7 @@ function renderList() {
       </button>`;
   };
 
-  let html = (tab === 'upcoming' ? unavBanner() : '') + addBtn;
+  let html = addBtn;
   if (tab === 'played') {
     // luni care se deschid / închid
     const groups = [];
@@ -1522,7 +1541,6 @@ function renderList() {
       html += rowHtml(m);
     }
   }
-  if (tab === 'upcoming') { html += unavSection(); loadUnav(); }
   // rândul de categorii NU se redesenează dacă e același: Safari pe iPhone i-ar reseta derularea
   const existing = view.querySelector('.chips');
   if (tab === 'played' && existing && existing.dataset.sig === chipsSig && view.querySelector('#listBody')) {
