@@ -261,7 +261,14 @@
     border-color: rgba(217,191,134,0.45); background: rgba(217,191,134,0.10); }
   .unav-banner b { color: var(--accent); }
   .unav-sec { margin-top: 8px; }
-  .unav-list.past li span:first-child { color: var(--muted); }
+  .unav-list.past .unav-row span:first-child { color: var(--muted); }
+  .unav-list li { padding: 0 !important; }
+  .unav-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .unav-row span:first-child { flex: 1; }
+  .unav-row .chev { color: var(--muted); flex: none; }
+  .fc-check { margin-top: 18px; padding: 12px 14px; border-radius: 12px; font-size: 14.5px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-edge); }
+  .fc-check.ok { color: #8fd19e; background: rgba(143,209,158,0.10); border-color: rgba(143,209,158,0.35); }
+  .fc-check.no { color: #ffb4ab; background: rgba(255,120,110,0.10); border-color: rgba(255,120,110,0.35); }
   .bottom-nav button { position: relative; }
   .bottom-nav .nav-dot { display: none; position: absolute; top: 7px; right: calc(50% - 16px); width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px rgba(22,26,38,0.9); }
   .bottom-nav button.due .nav-dot { display: block; }
@@ -789,6 +796,51 @@ function unavBanner() {
   return `<div class="glass unav-banner"><span><b>E sâmbătă.</b> Dă-te indisponibil pentru ${esc(fmtRange(w.start, w.end))}.</span>
     <button class="primary" type="button" data-unav-add>Mă dau indisponibil</button></div>`;
 }
+const unavState = (r) => r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'în așteptare';
+async function openUnavDetail(id) {
+  const r0 = (unav?.rows || []).find((x) => x.id === id);
+  if (!r0) return;
+  const days = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000) + 1;
+  const wd = (x) => new Date(x + 'T12:00:00').toLocaleDateString('ro-RO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const sh = $('#sheet');
+  const draw = (r, fc) => {
+    const n = days(r.start, r.end);
+    sh.innerHTML = `
+    <div class="sheet-head">
+      <button class="back" id="back" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Înapoi
+      </button>
+      <div class="board" style="grid-template-columns:1fr"><div class="club" id="sheetTitle" style="font-size:26px">${esc(fmtRange(r.start, r.end))}</div></div>
+    </div>
+    <div class="sec">
+      <div class="fc-check ${fc === true ? 'ok' : fc === false ? 'no' : ''}">${
+        fc === true ? 'Există în Football Connect (verificat acum).'
+        : fc === false ? 'Nu mai apare în Football Connect.'
+        : 'Verific în Football Connect…'}</div>
+      <h2>Detalii</h2>
+      <dl class="facts">
+        <div><dt>De la</dt><dd>${esc(wd(r.start))}</dd></div>
+        <div><dt>Până la</dt><dd>${esc(wd(r.end))}</dd></div>
+        <div><dt>Durată</dt><dd>${n} ${n === 1 ? 'zi' : 'zile'}</dd></div>
+        <div><dt>Motiv</dt><dd>${esc(r.reason || '–')}</dd></div>
+        <div><dt>AJF Alba</dt><dd>${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'nevalidată încă'}</dd></div>
+        <div><dt>CCA (FRF)</dt><dd>${r.validatedCCA === true ? 'validată' : 'nevalidată'}</dd></div>
+      </dl>
+    </div>`;
+    $('#back').onclick = () => history.back();
+  };
+  draw(r0, null);
+  sh.classList.remove('hidden');
+  sh.scrollTop = 0;
+  document.body.style.overflow = 'hidden';
+  history.pushState({ sheet: 'unav-' + id }, '');
+  await loadUnav(true);
+  if (history.state?.sheet !== 'unav-' + id) return;
+  const fresh = unav && !unav.failed && !unav.old ? (unav.rows || []).find((x) => x.id === id) : undefined;
+  draw(fresh || r0, unav && !unav.failed && !unav.old ? !!fresh : null);
+  if (unav?.failed) $('.fc-check').textContent = 'Nu am putut verifica acum în Football Connect.';
+}
 function renderUnav() {
   const v = $('#view');
   if (!unav) { v.innerHTML = '<div class="empty"><b>Se încarcă…</b>Citesc indisponibilitățile din Football Connect.</div>'; loadUnav(); return; }
@@ -803,9 +855,9 @@ function unavSection() {
   const rows = (unav.rows || []).filter((r) => r.end >= today).sort((a, b) => a.start.localeCompare(b.start));
   const past = (unav.rows || []).filter((r) => r.end < today).sort((a, b) => b.start.localeCompare(a.start));
   return `<div class="unav-sec"><h2 class="month">Urmează</h2>
-    ${rows.length ? `<ul class="unav-list">${rows.map((r) => `<li><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'trimisă'}</span></li>`).join('')}</ul>` : '<p class="fee-hint">Nicio indisponibilitate viitoare.</p>'}
+    ${rows.length ? `<ul class="unav-list">${rows.map((r) => `<li><button type="button" class="unav-row" data-unav-id="${esc(r.id)}"><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${unavState(r)}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`).join('')}</ul>` : '<p class="fee-hint">Nicio indisponibilitate viitoare.</p>'}
     <button class="add-btn" type="button" data-unav-add>Adaugă o indisponibilitate</button>
-    ${past.length ? `<h2 class="month">Trecute</h2><ul class="unav-list past">${past.map((r) => `<li><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'trimisă'}</span></li>`).join('')}</ul>` : ''}</div>`;
+    ${past.length ? `<h2 class="month">Trecute</h2><ul class="unav-list past">${past.map((r) => `<li><button type="button" class="unav-row" data-unav-id="${esc(r.id)}"><span>${esc(fmtRange(r.start, r.end))}</span><span class="r">${unavState(r)}</span><svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>`).join('')}</ul>` : ''}</div>`;
 }
 function openUnav() {
   const w = targetWeek();
@@ -1849,6 +1901,8 @@ document.addEventListener('click', (e) => {
   if (e.target.closest('#addMatch')) { openAdd(); return; }
   if (e.target.closest('[data-pop-close]') || e.target.id === 'pop') { closePop(); return; }
   if (e.target.closest('[data-unav-add]')) { openUnav(); return; }
+  const ur = e.target.closest('button[data-unav-id]');
+  if (ur) { openUnavDetail(ur.dataset.unavId); return; }
   const call = e.target.closest('button[data-call]');
   if (call) { const c = contacts.find((x) => x.name === call.dataset.call); if (c) openContact(call.dataset.label, c); return; }
   const cf = e.target.closest('button[data-confirm]');
