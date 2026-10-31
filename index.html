@@ -261,6 +261,10 @@
     border-color: rgba(217,191,134,0.45); background: rgba(217,191,134,0.10); }
   .unav-banner b { color: var(--accent); }
   .unav-sec { margin-top: 8px; }
+  #unavEdit input, #unavEdit button { box-sizing: border-box; width: 100%; max-width: 100%; }
+  #unavEdit .two { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+  #unavEdit .two > label { min-width: 0; }
+  #unavEdit input[type=date] { min-width: 0; -webkit-appearance: none; appearance: none; }
   .unav-list.past .unav-row span:first-child { color: var(--muted); }
   .unav-list li { padding: 0 !important; }
   .unav-row { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
@@ -796,7 +800,7 @@ function unavBanner() {
   return `<div class="glass unav-banner"><span><b>E sâmbătă.</b> Dă-te indisponibil pentru ${esc(fmtRange(w.start, w.end))}.</span>
     <button class="primary" type="button" data-unav-add>Mă dau indisponibil</button></div>`;
 }
-const unavState = (r) => r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'în așteptare';
+const unavState = (r) => { const n = Math.round((new Date(r.end + 'T12:00:00') - new Date(r.start + 'T12:00:00')) / 86400000) + 1; return n + (n === 1 ? ' zi' : ' zile'); };
 async function openUnavDetail(id) {
   const r0 = (unav?.rows || []).find((x) => x.id === id);
   if (!r0) return;
@@ -824,11 +828,39 @@ async function openUnavDetail(id) {
         <div><dt>Până la</dt><dd>${esc(wd(r.end))}</dd></div>
         <div><dt>Durată</dt><dd>${n} ${n === 1 ? 'zi' : 'zile'}</dd></div>
         <div><dt>Motiv</dt><dd>${esc(r.reason || '–')}</dd></div>
-        <div><dt>AJF Alba</dt><dd>${r.validated === true ? 'validată' : r.validated === false ? 'respinsă' : 'nevalidată încă'}</dd></div>
-        <div><dt>CCA (FRF)</dt><dd>${r.validatedCCA === true ? 'validată' : 'nevalidată'}</dd></div>
       </dl>
+      ${fc === false ? '' : `<h2>Modifică perioada</h2>
+      <form class="mine" id="unavEdit">
+        <div class="two">
+          <label>De la <input type="date" id="eStart" required value="${r.start}"></label>
+          <label>Până la <input type="date" id="eEnd" required value="${r.end}"></label>
+        </div>
+        <button class="primary" type="submit" id="eSave">Salvează în Football Connect</button>
+      </form>`}
     </div>`;
     $('#back').onclick = () => history.back();
+    const f = $('#unavEdit');
+    if (f) f.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const start = $('#eStart').value, end = $('#eEnd').value;
+      if (start === r.start && end === r.end) { toast('Nimic de schimbat'); return; }
+      if (end < start) { toast('Data de sfârșit e înaintea celei de început'); return; }
+      const btn = $('#eSave'); btn.disabled = true; btn.textContent = 'Se salvează…';
+      const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 60000);
+      try {
+        const key = store.get('meciuri_app_key');
+        const url = CONFIG.SYNC_URL + '?key=' + encodeURIComponent(key) + '&unav=edit&id=' + encodeURIComponent(r.id) + '&start=' + start + '&end=' + end;
+        const j = await (await fetch(url, { signal: ctrl.signal })).json();
+        if (!j.ok) throw new Error(j.error || 'Nu s-a salvat');
+        if (!j.edited) throw new Error('Scriptul Google nu e actualizat');
+        unav = { rows: j.rows, at: Date.now() }; store.set('meciuri_unav', unav);
+        toast('Salvat în Football Connect: ' + fmtRange(start, end));
+        draw(j.rows.find((x) => x.id === r.id) || r, true); render();
+      } catch (e) {
+        toast(e.name === 'AbortError' ? 'Football Connect nu a răspuns. Deschide din nou ca să verifici.' : e.message);
+        btn.disabled = false; btn.textContent = 'Salvează în Football Connect';
+      } finally { clearTimeout(timer); }
+    };
   };
   draw(r0, null);
   sh.classList.remove('hidden');
